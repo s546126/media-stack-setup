@@ -1,0 +1,81 @@
+# ============================================================================
+# ARR AUTOMATION STACK — Prowlarr / Sonarr / Radarr / Bazarr / Jellyseerr / Decypharr
+# Place at /mnt/data/media/docker-compose.arr.yml
+# Bring up as a SEPARATE compose project so it never touches the media stack:
+#   cd /mnt/data/media
+#   docker compose -p arr -f docker-compose.arr.yml config     # validate
+#   docker compose -p arr -f docker-compose.arr.yml pull
+#   docker compose -p arr -f docker-compose.arr.yml up -d
+# ----------------------------------------------------------------------------
+# This template binds each UI to the host's TAILSCALE IP (private). Replace
+# 100.x.x.x with the host's tailscale IP (`tailscale ip -4`). Binding to that IP
+# means the ports are reachable over your tailnet but NOT on the public internet.
+# (For per-service https hostnames instead, convert to sidecars — see
+#  references/tailscale-sidecars.md. Start with host-IP binding; it's simpler.)
+#
+# All six containers share the default `arr_default` network, so they reach each
+# other by container name (sonarr:8989, decypharr:8282, ...). The wiring in
+# references/wiring.md relies on that.
+#
+# Decypharr (cy01/blackhole) is the debrid bridge: it speaks the qBittorrent API
+# to Sonarr/Radarr, adds releases to Real-Debrid, and symlinks the cached files
+# from the rclone/zurg mount into download_folder. It MUST see /mnt at /mnt so
+# its symlinks (pointing at /mnt/zurg/...) are valid everywhere.
+# ============================================================================
+
+services:
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes: [ "./prowlarr-config:/config" ]
+    ports: [ "100.x.x.x:9696:9696" ]
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes:
+      - ./sonarr-config:/config
+      - /mnt:/mnt:rslave            # see RD library + symlink library at native paths
+    ports: [ "100.x.x.x:8989:8989" ]
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes:
+      - ./radarr-config:/config
+      - /mnt:/mnt:rslave
+    ports: [ "100.x.x.x:7878:7878" ]
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes:
+      - ./bazarr-config:/config
+      - /mnt:/mnt:rslave
+    ports: [ "100.x.x.x:6767:6767" ]
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    environment: [ LOG_LEVEL=info, TZ=UTC, PUID=1000, PGID=1000 ]
+    volumes: [ "./jellyseerr-config:/app/config" ]
+    ports: [ "100.x.x.x:5055:5055" ]
+
+  decypharr:
+    image: cy01/blackhole:latest        # aka ghcr.io/sirrobot01/decypharr
+    container_name: decypharr
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes:
+      - ./decypharr-config:/app         # holds config.json (debrids, download_folder)
+      - /mnt:/mnt:rslave                # reads /mnt/zurg, writes symlinks to library
+    ports: [ "100.x.x.x:8282:8282" ]

@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="700" viewBox="0 0 1480 700" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,PingFang SC,Microsoft YaHei,sans-serif">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#475569"/></marker>
+    <marker id="arA" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#d97706"/></marker>
+    <marker id="arR" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#e11d48"/></marker>
+    <marker id="arB" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#7c3aed"/></marker>
+  </defs>
+  <rect width="1480" height="700" fill="#ffffff"/>
+
+  <text x="40" y="40" font-size="25" font-weight="700" fill="#0f172a">影音库自动化架构</text>
+  <text x="40" y="62" font-size="12.5" fill="#64748b">Oracle ARM · Always Free · 单机 · 全 Docker · Tailscale 私网 · 配置每日 04:30 备份 → Google Drive</text>
+
+  <rect x="40" y="78" width="1400" height="30" rx="6" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="54" y="98" font-size="12.5" fill="#334155">流程：<tspan font-weight="700">①</tspan> 求片/索引 → <tspan font-weight="700">②</tspan> Sonarr/Radarr 决定抓什么 → <tspan font-weight="700">③</tspan> Decypharr 加种到 Real-Debrid → <tspan font-weight="700">④</tspan> zurg 串流挂载 + 符号链接进库 → <tspan font-weight="700">⑤</tspan> Plex 或 Jellyfin 播放（中文海报+字幕）</text>
+
+  <!-- ===== TOP CLOUD SOURCES ===== -->
+  <rect x="700" y="128" width="260" height="50" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="830" y="150" font-size="13" font-weight="700" fill="#92400e" text-anchor="middle">☁ Real-Debrid</text>
+  <text x="830" y="168" font-size="11" fill="#a16207" text-anchor="middle">影片源 · 串流不占盘</text>
+
+  <rect x="991" y="56" width="215" height="46" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="1098" y="84" font-size="12.5" font-weight="700" fill="#92400e" text-anchor="middle">☁ 百度 / 夸克 / 阿里云盘</text>
+
+  <rect x="991" y="150" width="215" height="44" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="1098" y="170" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">alist :5244 + rclone-alist</text>
+  <text x="1098" y="186" font-size="10.5" fill="#64748b" text-anchor="middle">→ /mnt/alist (FUSE)</text>
+
+  <!-- ===== STAGE HEADERS ===== -->
+  <text x="139"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">① 入口</text>
+  <text x="381"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">② 自动抓取 (arr)</text>
+  <text x="603"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">③ Debrid 桥</text>
+  <text x="837"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">④ 挂载 + 整理</text>
+  <text x="1098" y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">⑤ 播放</text>
+  <text x="1340" y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">📺 观看端</text>
+
+  <!-- ===== STAGE GROUP CONTAINERS ===== -->
+  <rect x="42"  y="260" width="194" height="140" rx="10" fill="#faf5ff" stroke="#ddd6fe" stroke-width="1.2"/>
+  <rect x="280" y="260" width="203" height="150" rx="10" fill="#faf5ff" stroke="#ddd6fe" stroke-width="1.2"/>
+  <rect x="723" y="260" width="228" height="148" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.2"/>
+  <rect x="997" y="260" width="203" height="140" rx="10" fill="#f0fdfa" stroke="#ccfbf1" stroke-width="1.2"/>
+
+  <text x="40" y="432" font-size="11.5" fill="#94a3b8">Docker 容器层（media 栈 + arr 栈，共享宿主机 /mnt）</text>
+
+  <!-- ===== S1 entry ===== -->
+  <rect x="52" y="270" width="176" height="54" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="140" y="291" font-size="12.5" font-weight="700" fill="#5b21b6" text-anchor="middle">Jellyseerr :5055</text>
+  <text x="140" y="309" font-size="10.5" fill="#6d28d9" text-anchor="middle">求片 · 家人自助</text>
+  <rect x="52" y="338" width="176" height="54" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="140" y="359" font-size="12.5" font-weight="700" fill="#5b21b6" text-anchor="middle">Prowlarr :9696</text>
+  <text x="140" y="377" font-size="10.5" fill="#6d28d9" text-anchor="middle">索引器聚合</text>
+
+  <!-- ===== S2 arr core ===== -->
+  <rect x="286" y="268" width="191" height="42" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="381" y="294" font-size="12.5" font-weight="700" fill="#5b21b6" text-anchor="middle">Sonarr :8989 · 剧</text>
+  <rect x="286" y="314" width="191" height="42" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="381" y="340" font-size="12.5" font-weight="700" fill="#5b21b6" text-anchor="middle">Radarr :7878 · 影</text>
+  <rect x="286" y="360" width="191" height="40" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="381" y="385" font-size="11.5" fill="#6d28d9" text-anchor="middle">Bazarr :6767 · 中文字幕</text>
+
+  <!-- ===== S3 decypharr ===== -->
+  <rect x="535" y="293" width="136" height="80" rx="8" fill="#fce7f3" stroke="#db2777" stroke-width="1.5"/>
+  <text x="603" y="318" font-size="12.5" font-weight="700" fill="#9d174d" text-anchor="middle">Decypharr</text>
+  <text x="603" y="334" font-size="11" fill="#be185d" text-anchor="middle">:8282 qbit</text>
+  <text x="603" y="350" font-size="10.5" fill="#be185d" text-anchor="middle">加种 → RD</text>
+  <text x="603" y="365" font-size="10.5" fill="#be185d" text-anchor="middle">出符号链接</text>
+
+  <!-- ===== S4 mount + organize ===== -->
+  <rect x="729" y="267" width="216" height="40" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="837" y="292" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">zurg :9999 · RD WebDAV</text>
+  <rect x="729" y="311" width="216" height="40" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="837" y="336" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">rclone → /mnt/zurg (FUSE)</text>
+  <rect x="729" y="355" width="216" height="46" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+  <text x="837" y="374" font-size="12" font-weight="700" fill="#075985" text-anchor="middle">符号链接库</text>
+  <text x="837" y="390" font-size="10" fill="#0369a1" text-anchor="middle">/mnt/data/media/library</text>
+
+  <!-- ===== S5 playback (Plex 与 Jellyfin 同类·二选一) ===== -->
+  <rect x="1003" y="270" width="191" height="40" rx="8" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/>
+  <text x="1098" y="295" font-size="12.5" font-weight="700" fill="#115e59" text-anchor="middle">Plex :32400 · host</text>
+  <text x="1098" y="326" font-size="11" font-weight="700" fill="#0f766e" text-anchor="middle">—— 或 · 二选一 ——</text>
+  <rect x="1003" y="334" width="191" height="40" rx="8" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/>
+  <text x="1098" y="359" font-size="12.5" font-weight="700" fill="#115e59" text-anchor="middle">Jellyfin (+ts)</text>
+  <text x="1098" y="392" font-size="10" fill="#0f766e" text-anchor="middle">同类媒体服务器 · 库中文 zh-CN</text>
+
+  <!-- ===== S6 users ===== -->
+  <rect x="1252" y="296" width="176" height="68" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="1340" y="324" font-size="12.5" font-weight="700" fill="#1e40af" text-anchor="middle">👤 你 / 家人</text>
+  <text x="1340" y="342" font-size="10.5" fill="#1d4ed8" text-anchor="middle">全平台 app</text>
+  <text x="1340" y="357" font-size="10.5" fill="#1d4ed8" text-anchor="middle">TV / 手机 / 网页</text>
+
+  <!-- ===== ORTHOGONAL CONNECTORS ===== -->
+  <line x1="236"  y1="330" x2="280"  y2="330" stroke="#475569" stroke-width="1.8" marker-end="url(#ar)"/>
+  <line x1="483"  y1="330" x2="535"  y2="330" stroke="#475569" stroke-width="1.8" marker-end="url(#ar)"/>
+  <line x1="671"  y1="330" x2="723"  y2="330" stroke="#475569" stroke-width="1.8" marker-end="url(#ar)"/>
+  <line x1="951"  y1="330" x2="997"  y2="330" stroke="#475569" stroke-width="1.8" marker-end="url(#ar)"/>
+  <line x1="1200" y1="330" x2="1252" y2="330" stroke="#475569" stroke-width="1.8" marker-end="url(#ar)"/>
+
+  <polyline points="603,293 603,153 698,153" fill="none" stroke="#e11d48" stroke-width="1.6" marker-end="url(#arR)"/>
+  <text x="611" y="210" font-size="10.5" fill="#e11d48">加种</text>
+  <line x1="868" y1="178" x2="868" y2="265" stroke="#d97706" stroke-width="1.6" marker-end="url(#arA)"/>
+  <text x="876" y="232" font-size="10.5" fill="#b45309">缓存命中</text>
+
+  <line x1="1098" y1="102" x2="1098" y2="148" stroke="#d97706" stroke-width="1.6" marker-end="url(#arA)"/>
+  <line x1="1098" y1="194" x2="1098" y2="268" stroke="#475569" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <line x1="837" y1="307" x2="837" y2="311" stroke="#64748b" stroke-width="1.4"/>
+  <line x1="837" y1="351" x2="837" y2="355" stroke="#64748b" stroke-width="1.4"/>
+
+  <line x1="300" y1="358" x2="300" y2="312" stroke="#7c3aed" stroke-width="1.3" marker-end="url(#arB)" stroke-dasharray="3 3"/>
+
+  <!-- ===== INFRA BAND ===== -->
+  <rect x="40" y="460" width="1148" height="200" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="56" y="484" font-size="13" font-weight="700" fill="#334155">宿主机层（非容器，直接装在 OS 上）</text>
+
+  <rect x="56" y="500" width="220" height="56" rx="8" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="166" y="523" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">docker + containerd</text>
+  <text x="166" y="540" font-size="10" fill="#64748b" text-anchor="middle">/var/lib/containerd → /mnt/data</text>
+
+  <rect x="292" y="500" width="300" height="56" rx="8" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="442" y="523" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">host Tailscale（私网）</text>
+  <text x="442" y="540" font-size="10" fill="#64748b" text-anchor="middle">各服务独立 tailscale 节点 · https 直达</text>
+
+  <rect x="608" y="500" width="200" height="56" rx="8" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="708" y="523" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">FUSE 挂载点</text>
+  <text x="708" y="540" font-size="10" fill="#64748b" text-anchor="middle">/mnt/zurg · /mnt/alist</text>
+
+  <rect x="824" y="500" width="172" height="56" rx="8" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="910" y="523" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">cron 04:30</text>
+  <text x="910" y="540" font-size="10" fill="#64748b" text-anchor="middle">配置备份</text>
+
+  <rect x="1012" y="500" width="160" height="56" rx="8" fill="#fef3c7" stroke="#f59e0b"/>
+  <text x="1092" y="532" font-size="12" font-weight="700" fill="#92400e" text-anchor="middle">☁ Google Drive</text>
+
+  <line x1="996" y1="528" x2="1010" y2="528" stroke="#475569" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <text x="56" y="592" font-size="11" fill="#64748b">单机 = 单点；boot 200G；影片在 Real-Debrid / 云盘，不落本地盘；docker 容器 restart=unless-stopped 开机自启。</text>
+  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈 8 容器（zurg/rclone/alist/plex/jellyfin…）+ arr 栈 6 容器，跨栈走宿主机 /mnt 路径 + tailscale 黏合。</text>
+  <text x="56" y="636" font-size="11" fill="#64748b">访问：每个服务都有独立 tailscale 节点，内网 https://&lt;服务名&gt;.&lt;你的tailnet&gt;.ts.net 直达，无公网暴露。</text>
+
+  <!-- ===== HUNTER ===== -->
+  <rect x="1204" y="460" width="236" height="200" rx="12" fill="#ffe4e6" stroke="#e11d48" stroke-width="1.8"/>
+  <text x="1322" y="488" font-size="14" font-weight="700" fill="#9f1239" text-anchor="middle">🤖 影音库 hunter</text>
+  <text x="1322" y="512" font-size="11" fill="#be123c" text-anchor="middle">Claude Code · Opus 4.8</text>
+  <text x="1322" y="530" font-size="11" fill="#be123c" text-anchor="middle">tmux · Remote Control</text>
+  <text x="1322" y="548" font-size="11" fill="#be123c" text-anchor="middle">bypass-permissions</text>
+  <text x="1322" y="576" font-size="10.5" fill="#9f1239" text-anchor="middle">自主维护整套</text>
+  <text x="1322" y="594" font-size="10.5" fill="#9f1239" text-anchor="middle">健康 / 更新 / 网络加固</text>
+  <text x="1322" y="618" font-size="10" fill="#9f1239" text-anchor="middle">— 维护 →</text>
+
+  <line x1="1204" y1="600" x2="1188" y2="600" stroke="#e11d48" stroke-width="1.6" marker-end="url(#arR)" stroke-dasharray="4 3"/>
+</svg>

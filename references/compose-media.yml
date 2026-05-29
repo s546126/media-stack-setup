@@ -1,0 +1,151 @@
+# ============================================================================
+# MEDIA STACK — zurg + rclone (+ alist) + Plex/Jellyfin
+# Place at e.g. /mnt/data/media/docker-compose.yml ; run from that dir.
+# ----------------------------------------------------------------------------
+# BEFORE bringing this up:
+#   1) zurg/config.yml  — minimal:
+#        zurg: v1
+#        token: <YOUR_REAL_DEBRID_API_TOKEN>     # from real-debrid.com/apitoken
+#        check_for_changes_every_secs: 10
+#        enable_repair: true
+#        on_library_update: sh plex_update.sh "$@"   # auto-refresh Plex on changes
+#        directories:
+#          shows:  { group_order: 10, group: media, filters: [ { has_episodes: true } ] }
+#          movies: { group_order: 20, group: media, filters: [ regex: /.*/ ] }
+#      (full example: github.com/debridmediamanager/zurg-testing)
+#   2) zurg/rclone.conf — a [zurg] WebDAV remote:
+#        [zurg]
+#        type = webdav
+#        url = http://zurg:9999/dav
+#        vendor = other
+#        pacer_min_sleep = 0
+#      (add an [alist] remote too if using alist)
+#   3) zurg/scripts/plex_update.sh — the zurg-provided Plex partial-scan script
+#      (set localhost + your Plex token; harmless to omit if no Plex).
+#   4) mkdir -p /mnt/zurg /mnt/alist /mnt/data/cache /mnt/data/library/{tv,movies}
+#
+# KEY POINTS:
+#   - rclone needs cap_add SYS_ADMIN + /dev/fuse + apparmor:unconfined to FUSE-mount.
+#   - The mount uses :rshared so the FUSE submount propagates to other containers.
+#   - Plex/Jellyfin mount BOTH the app paths AND /mnt:/mnt:rslave — the latter is
+#     REQUIRED so the arr stack's symlinks (which point at /mnt/zurg/...) resolve.
+#   - PUID/PGID=1000 should match the owner of the ./ config dirs.
+#   - Plex uses host networking; Jellyfin here rides a tailscale sidecar (Phase 4).
+#     Plex and Jellyfin do the same job — run one or both.
+# ============================================================================
+
+services:
+  zurg:
+    image: ghcr.io/debridmediamanager/zurg-testing:latest
+    container_name: zurg
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9999:9999"          # localhost only; do NOT expose 0.0.0.0 publicly
+    volumes:
+      - ./zurg/config.yml:/app/config.yml
+      - ./zurg/scripts/plex_update.sh:/app/plex_update.sh
+      - zurgdata:/app/data
+
+  rclone:
+    image: rclone/rclone:latest
+    container_name: rclone
+    restart: unless-stopped
+    environment: { TZ: UTC, PUID: 1000, PGID: 1000 }
+    volumes:
+      - /mnt/zurg:/data:rshared
+      - ./zurg/rclone.conf:/config/rclone/rclone.conf
+      - /mnt/data/cache:/cache
+    cap_add: [ SYS_ADMIN ]
+    security_opt: [ "apparmor:unconfined" ]
+    devices: [ "/dev/fuse:/dev/fuse:rwm" ]
+    depends_on: [ zurg ]
+    command: >-
+      mount zurg: /data --allow-other --allow-non-empty --dir-cache-time 10s
+      --vfs-cache-mode full --cache-dir /cache --vfs-cache-max-size 20G --buffer-size 64M
+
+  # ---- optional: alist for 百度/夸克/阿里云盘, behind its own tailscale sidecar ----
+  alist:
+    image: xhofe/alist:latest
+    container_name: alist
+    restart: unless-stopped
+    environment: [ PUID=1000, PGID=1000, UMASK=022, TZ=UTC ]
+    volumes: [ "./alist:/opt/alist/data" ]
+    network_mode: "service:alist-ts"
+    depends_on: [ alist-ts ]
+  alist-ts:
+    image: tailscale/tailscale:latest
+    container_name: alist-ts
+    restart: unless-stopped
+    hostname: alist
+    environment:
+      - TS_HOSTNAME=alist
+      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:5244 (see Phase 4)
+    volumes:
+      - tailscale-alist:/var/lib/tailscale
+      - ./alist-ts:/config
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [ NET_ADMIN, NET_RAW ]
+  rclone-alist:
+    image: rclone/rclone:latest
+    container_name: rclone-alist
+    restart: unless-stopped
+    environment: { TZ: UTC, PUID: 1000, PGID: 1000 }
+    volumes:
+      - /mnt/alist:/data:rshared
+      - ./zurg/rclone.conf:/config/rclone/rclone.conf
+      - /mnt/data/cache-alist:/cache
+    cap_add: [ SYS_ADMIN ]
+    security_opt: [ "apparmor:unconfined" ]
+    devices: [ "/dev/fuse:/dev/fuse:rwm" ]
+    depends_on: [ alist ]
+    command: >-
+      mount alist: /data --allow-other --allow-non-empty --dir-cache-time 30s
+      --vfs-cache-mode full --cache-dir /cache --vfs-cache-max-size 10G --buffer-size 32M
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    network_mode: host                  # Plex prefers host net for discovery/direct play
+    environment: [ PUID=1000, PGID=1000, TZ=UTC, VERSION=docker ]
+    volumes:
+      - ./plex-config:/config
+      - ./plex-transcode:/transcode
+      - /mnt:/mnt:rslave                # REQUIRED: symlinks point at /mnt/zurg/...
+    depends_on: [ rclone ]
+
+  jellyfin-ts:
+    image: tailscale/tailscale:latest
+    container_name: jellyfin-ts
+    restart: unless-stopped
+    hostname: jellyfin
+    environment:
+      - TS_HOSTNAME=jellyfin
+      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8096
+    volumes:
+      - tailscale-jellyfin:/var/lib/tailscale
+      - ./jellyfin-ts:/config
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [ NET_ADMIN, NET_RAW ]
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    network_mode: "service:jellyfin-ts"
+    environment: [ PUID=1000, PGID=1000, TZ=UTC ]
+    volumes:
+      - ./jellyfin-config:/config
+      - ./jellyfin-cache:/cache
+      - /mnt:/mnt:rslave                # REQUIRED for symlink resolution
+    depends_on: [ rclone, jellyfin-ts ]
+
+volumes:
+  zurgdata:
+  tailscale-alist:
+  tailscale-jellyfin:
