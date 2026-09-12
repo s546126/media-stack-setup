@@ -108,6 +108,26 @@ if [ "$1" = copyto ]; then tar -tzf "$2" > "$CALLS.archive"; fi
                 self.assertNotIn('rclone delete', self.calls())
                 self.assertNotIn('DONE', result.stdout)
 
+    def test_retention_failure_is_reported(self):
+        result = self.run_backup('delete')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('rclone moveto', self.calls())
+        self.assertNotIn('DONE', result.stdout)
+
+    def test_symlink_is_archived_without_reading_remote_media(self):
+        import tarfile
+        (self.media / 'plex-config' / 'remote-link').symlink_to('/mnt/zurg/missing-media')
+        self.mock('rclone', '\n'.join([
+            'printf "rclone %s\\n" "$*" >> "$CALLS"',
+            'if [ "$1" = copyto ]; then cp "$2" "$CALLS.tar.gz"; fi',
+        ]))
+        result = self.run_backup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with tarfile.open(str(self.log) + '.tar.gz') as archive:
+            member = archive.getmember('plex-config/remote-link')
+            self.assertTrue(member.issym())
+            self.assertEqual(member.linkname, '/mnt/zurg/missing-media')
+
     def test_archive_failure_recovers_containers(self):
         self.mock('tar', 'exit 2\n')
         result = self.run_backup()

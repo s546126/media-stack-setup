@@ -2,7 +2,7 @@
 name: media-stack-setup
 description: >-
   Step-by-step guide to self-host a streaming media library on a single Linux
-  box: Real-Debrid + zurg + rclone for storage-free streaming, the *arr stack
+  box: Real-Debrid + zurg + rclone for remote streaming with local caching, the *arr stack
   (Sonarr/Radarr/Prowlarr/Bazarr/Jellyseerr) with a Decypharr debrid bridge for
   full automation, Plex/Jellyfin playback with Chinese metadata, private
   Tailscale access (no public exposure), and daily config backup. Use this
@@ -15,8 +15,8 @@ description: >-
 
 # Media Stack Setup — Real-Debrid 串流影音库 + 全自动化
 
-Build a complete self-hosted media library where **the media never lives on
-local disk** — Real-Debrid (RD) holds the files, `zurg`+`rclone` stream them
+Build a complete self-hosted media library with **remote media and a local
+streaming cache** — Real-Debrid (RD) holds the files, `zurg`+`rclone` stream them
 through a FUSE mount, and the *arr apps automate acquisition. Plex/Jellyfin
 serve playback; everything is reachable privately over Tailscale.
 
@@ -93,6 +93,8 @@ then uploads. Confirm a restore drill before scheduling cron.
 
 ## Bundled files
 
+- `references/deployment.md` — Linux preparation, profiles, networks and acceptance
+- `references/backup.md` — backup consistency, scheduling and restore
 - `references/compose-media.yml` — media stack template + setup notes
 - `references/compose-arr.yml` — arr automation stack template
 - `references/wiring.md` — API wiring, Decypharr RD bridge, root folders, 中文化
