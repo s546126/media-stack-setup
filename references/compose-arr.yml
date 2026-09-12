@@ -3,12 +3,13 @@
 # Place at /mnt/data/media/docker-compose.arr.yml
 # Bring up as a SEPARATE compose project so it never touches the media stack:
 #   cd /mnt/data/media
+#   docker network inspect media-playback >/dev/null 2>&1 || docker network create media-playback
 #   docker compose -p arr -f docker-compose.arr.yml config     # validate
 #   docker compose -p arr -f docker-compose.arr.yml pull
 #   docker compose -p arr -f docker-compose.arr.yml up -d
 # ----------------------------------------------------------------------------
-# This template binds each UI to the host's TAILSCALE IP (private). Replace
-# 100.x.x.x with the host's tailscale IP (`tailscale ip -4`). Binding to that IP
+# This template defaults to localhost. Set BIND_IP in .env to the host's
+# Tailscale IPv4 address (`tailscale ip -4`) for tailnet access. Binding to that IP
 # means the ports are reachable over your tailnet but NOT on the public internet.
 # (For per-service https hostnames instead, convert to sidecars — see
 #  references/tailscale-sidecars.md. Start with host-IP binding; it's simpler.)
@@ -30,7 +31,7 @@ services:
     restart: unless-stopped
     environment: [ PUID=1000, PGID=1000, TZ=UTC ]
     volumes: [ "./prowlarr-config:/config" ]
-    ports: [ "100.x.x.x:9696:9696" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:9696:9696" ]
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
@@ -40,7 +41,7 @@ services:
     volumes:
       - ./sonarr-config:/config
       - /mnt:/mnt:rslave            # see RD library + symlink library at native paths
-    ports: [ "100.x.x.x:8989:8989" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:8989:8989" ]
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -50,7 +51,7 @@ services:
     volumes:
       - ./radarr-config:/config
       - /mnt:/mnt:rslave
-    ports: [ "100.x.x.x:7878:7878" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:7878:7878" ]
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
@@ -60,15 +61,16 @@ services:
     volumes:
       - ./bazarr-config:/config
       - /mnt:/mnt:rslave
-    ports: [ "100.x.x.x:6767:6767" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:6767:6767" ]
 
   jellyseerr:
+    networks: [ default, playback ]
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
     restart: unless-stopped
     environment: [ LOG_LEVEL=info, TZ=UTC, PUID=1000, PGID=1000 ]
     volumes: [ "./jellyseerr-config:/app/config" ]
-    ports: [ "100.x.x.x:5055:5055" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:5055:5055" ]
 
   decypharr:
     image: cy01/blackhole:latest        # aka ghcr.io/sirrobot01/decypharr
@@ -78,4 +80,9 @@ services:
     volumes:
       - ./decypharr-config:/app         # holds config.json (debrids, download_folder)
       - /mnt:/mnt:rslave                # reads /mnt/zurg, writes symlinks to library
-    ports: [ "100.x.x.x:8282:8282" ]
+    ports: [ "${BIND_IP:-127.0.0.1}:8282:8282" ]
+
+networks:
+  playback:
+    external: true
+    name: media-playback

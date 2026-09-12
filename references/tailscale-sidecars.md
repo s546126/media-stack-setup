@@ -65,7 +65,7 @@ jellyseerr 5055, decypharr 8282). Put each in `./<svc>-ts/serve.json`.
     hostname: sonarr
     environment:
       - TS_HOSTNAME=sonarr
-      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
       - TS_SERVE_CONFIG=/config/serve.json
@@ -75,7 +75,6 @@ jellyseerr 5055, decypharr 8282). Put each in `./<svc>-ts/serve.json`.
     volumes:
       - tailscale-sonarr:/var/lib/tailscale
       - ./sonarr-ts:/config
-    cap_add: [ NET_ADMIN, NET_RAW ]   # harmless in userspace; some images expect them
 
   sonarr:
     # ... existing definition, but:
@@ -83,10 +82,12 @@ jellyseerr 5055, decypharr 8282). Put each in `./<svc>-ts/serve.json`.
     # and REMOVE the `ports:` line (the sidecar now fronts it)
 ```
 Add a matching `tailscale-<svc>` named volume for each. Repeat for every UI you
-want a hostname for. Validate (`docker compose -p arr config`), then
+want a hostname for. Validate (`docker compose -p arr -f docker-compose.arr.yml config`), then
 `up -d`. Check `tailscale status` shows the new nodes; confirm
 `https://<svc>.<tailnet>.ts.net` returns the app, and that inter-app wiring
 (Prowlarr↔Sonarr/Radarr, Sonarr/Radarr→Decypharr) still works.
 
-If MagicDNS is enabled on your tailnet (it usually is), the short name
-`https://sonarr` also works from tailnet devices.
+Enable MagicDNS and HTTPS certificates in the Tailscale admin console. Use the
+full `https://sonarr.<tailnet>.ts.net` name: the HTTPS certificate does not cover
+the short `https://sonarr` name. Never enable Funnel for these private services.
+Mount the config directory (not just the JSON file) so updates can be detected.

@@ -36,9 +36,9 @@ phase that needs them — keep this file as the map.
 - **access**: a Tailscale sidecar per user-facing service → `https://<svc>.<tailnet>.ts.net`, nothing on the public internet.
 - **safety net**: daily cron backup of all configs → Google Drive (rclone).
 
-## Prerequisites — confirm with the user before starting
+## Prerequisites — check existing context; ask only for missing requirements
 
-1. **A Linux host with Docker** (1+ core, 2GB+ RAM; an Oracle Always Free ARM A1 works well). Install Docker Engine + compose plugin via the official `get.docker.com` if absent.
+1. **A Linux host with Docker** (1+ core, 2GB+ RAM; an Oracle Always Free ARM A1 works well). Use the official Docker Engine repository instructions for the host distribution if absent.
 2. **A Real-Debrid subscription** + its API token (`https://real-debrid.com/apitoken`).
 3. **A Tailscale account** (for private access) + ability to generate a **reusable, non-ephemeral** auth key (`https://login.tailscale.com/admin/settings/keys`).
 4. *(Optional)* Plex account / Plex Pass; a Google account + `rclone` gdrive remote for backups; cloud-drive creds for alist.
@@ -53,7 +53,8 @@ Work top-down. Each phase points to the file with the concrete templates/command
 Deploy zurg + rclone (+ optional alist) + Plex/Jellyfin.
 → Use the template in **`references/compose-media.yml`** and the notes at its top
 (zurg `config.yml` with the RD token, the `rclone.conf`, the FUSE/`SYS_ADMIN`/`/dev/fuse` requirements, and the **`/mnt:/mnt:rslave`** mounts on Plex/Jellyfin).
-Verify: `ls /mnt/zurg` shows the RD library (`movies/`, `shows/`, …).
+First follow **`references/deployment.md`** for shared-mount preparation, profiles,
+project names and private bindings. Verify: `ls /mnt/zurg` shows the RD library (`movies/`, `shows/`, …).
 
 ### Phase 2 — arr automation stack
 Deploy Prowlarr/Sonarr/Radarr/Bazarr/Jellyseerr/Decypharr as a **separate compose project** (`-p arr`) so it never disturbs the media stack.
@@ -79,8 +80,9 @@ profile + a subtitle provider; optionally enable Plex/Jellyfin built-in subtitle
 download. → Section in **`references/wiring.md`** ("中文化").
 
 ### Phase 6 — config backup
-Install the daily cron job that tars the configs and pushes them to Google Drive.
-→ Use **`scripts/config-backup.sh`** (edit the remote + retention, then add to crontab).
+Configure and test **`scripts/config-backup.sh`** using **`references/backup.md`**.
+It briefly stops running stack containers for a consistent archive, restarts them,
+then uploads. Confirm a restore drill before scheduling cron.
 
 ## Operating principles (apply throughout)
 
