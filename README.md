@@ -2,7 +2,7 @@
 
 A [Claude Code](https://docs.claude.com/en/docs/claude-code) **skill** + setup
 guide for self-hosting a **streaming media library** on a single Linux box — where
-the media never lives on local disk.
+media is streamed from remote storage with a local VFS cache.
 
 Real-Debrid holds the files; `zurg` + `rclone` stream them through a FUSE mount;
 the *arr stack automates acquisition; Plex/Jellyfin serve playback with Chinese
@@ -49,6 +49,25 @@ Then in Claude Code, just ask — e.g. *"帮我搭一套 Real-Debrid 影音库"*
 *"set up Sonarr/Radarr with Real-Debrid and Plex"* — and the skill triggers,
 walking the setup phase by phase. Or read [`SKILL.md`](SKILL.md) directly as a
 guide.
+
+## Deployment and validation
+
+Start with [deployment.md](references/deployment.md) for Linux mount preparation,
+profile selection, private defaults and target-host acceptance. The base media
+profile starts only zurg/rclone; explicitly choose Plex, Jellyfin and/or alist.
+Read [backup.md](references/backup.md) before scheduling backups: they briefly
+stop running stack containers and require local archive space.
+
+Run the repository checks without service credentials:
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 -m unittest discover -s tests -v
+bash -n scripts/config-backup.sh
+```
+
+CI also validates both templates with Docker Compose and runs ShellCheck.
+These checks do not replace the target-host playback, reboot and restore drills.
 
 ## Notes
 
