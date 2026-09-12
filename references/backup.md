@@ -6,8 +6,9 @@ Do not put interactive sudo inside cron. Configure that account's rclone remote
 first. Use an rclone `crypt` remote if the archive should be encrypted in Drive:
 archives contain `.env`, API tokens, and rclone credentials.
 
-The script locks per `MEDIA_DIR`, stops the currently running containers labeled
-with Compose projects `media` and `arr`, archives their configuration, and restarts
+The script locks per `MEDIA_DIR`, stops the currently running app writers in Compose projects `media` and `arr`
+(Plex, Jellyfin, alist and the supported *arr apps, including optional Lidarr,
+qBittorrent and Navidrome), archives their configuration, and restarts
 those same containers before uploading. This causes a short playback/service
 interruption but makes SQLite databases and WAL files consistent. A failed stop
 or tar triggers a restart attempt and fails the job. SIGKILL/power loss cannot
@@ -15,8 +16,8 @@ run cleanup: check services after a terminated backup. No unrelated process may
 write these configuration directories during the snapshot.
 
 Set `MEDIA_PROJECT` / `ARR_PROJECT` if your actual project names differ. Check
-`docker ps --format '{{.Names}} {{.Labels}}'` before the first run. Projects must
-be dedicated to this stack. Bind-mounted configs are archived; Docker named
+`docker ps --format '{{.Names}} {{.Labels}}'` before the first run. FUSE containers, Tailscale sidecars and unrelated services remain running.
+Custom app writers/config directories require extending the script's allowlists. Bind-mounted configs are archived; Docker named
 volumes (`zurgdata`, Tailscale identities) are **not**. After a full host loss,
 zurg rebuilds its state and sidecars need fresh auth keys and re-registration;
 check hostname changes and ACL grants. Back up named volumes separately if node

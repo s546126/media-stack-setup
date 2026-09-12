@@ -60,7 +60,7 @@ class Backup(unittest.TestCase):
 printf 'docker %s\\n' "$*" >> "$CALLS"
 if [ "$1" = ps ]; then
   if [ "$RUNNING" = 1 ]; then
-    case "$*" in *project=media*) echo media-id;; *project=arr*) echo arr-id;; esac
+    case "$*" in *project=media*) printf "media-id plex\\nmount-id rclone\\nsidecar-id plex-ts\\n";; *project=arr*) echo "arr-id sonarr";; esac
   fi
 elif [ "$1" = "$FAIL" ]; then exit 1; fi
 ''')
@@ -93,6 +93,8 @@ if [ "$1" = copyto ]; then tar -tzf "$2" > "$CALLS.archive"; fi
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
         self.assertLess(calls.index('docker start'), calls.index('rclone copyto'))
+        self.assertNotIn('mount-id', calls)
+        self.assertNotIn('sidecar-id', calls)
         self.assertLess(calls.index('rclone moveto'), calls.index('rclone delete'))
         listing = Path(str(self.log) + '.archive').read_text()
         self.assertIn('plex-config/database.db', listing)

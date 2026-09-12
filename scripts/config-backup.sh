@@ -44,19 +44,24 @@ trap 'exit 143' TERM
 # Collect only configuration. Never follow media symlinks or traverse FUSE mounts.
 paths=(docker-compose.yml docker-compose.arr.yml)
 for path in .env zurg alist plex-config jellyfin-config prowlarr-config sonarr-config \
-  radarr-config bazarr-config jellyseerr-config decypharr-config; do
+  radarr-config bazarr-config jellyseerr-config decypharr-config lidarr-config \
+  qbittorrent-config navidrome-data; do
   [[ ! -e $path ]] || paths+=("$path")
 done
 for path in *-ts; do
   [[ ! -d $path ]] || paths+=("$path")
 done
 
-# Quiesce running containers in these projects for consistent SQLite + WAL files.
-# Record the entire set before stopping so partial stop failures are recoverable.
-ids=$(docker ps -q --filter "label=com.docker.compose.project=$MEDIA_PROJECT")
-arr_ids=$(docker ps -q --filter "label=com.docker.compose.project=$ARR_PROJECT")
-while IFS= read -r id; do
-  [[ -z $id ]] || stopped+=("$id")
+# Stop only writers of the included app configs. Leave FUSE and network
+# sidecars running so a backup cannot detach mounts or interrupt unrelated apps.
+format='{{.ID}} {{.Label "com.docker.compose.service"}}'
+ids=$(docker ps --format "$format" --filter "label=com.docker.compose.project=$MEDIA_PROJECT")
+arr_ids=$(docker ps --format "$format" --filter "label=com.docker.compose.project=$ARR_PROJECT")
+while read -r id service; do
+  case "$service" in
+    alist|plex|jellyfin|prowlarr|sonarr|radarr|bazarr|jellyseerr|decypharr|lidarr|qbittorrent|navidrome)
+      stopped+=("$id") ;;
+  esac
 done <<< "$ids${arr_ids:+$'\n'$arr_ids}"
 if ((${#stopped[@]})); then
   docker stop --time 60 "${stopped[@]}" >/dev/null
