@@ -24,7 +24,7 @@ internet); configs back up daily to Google Drive.
 
 - **media stack** — zurg (RD client) → rclone FUSE mount `/mnt/zurg`; optional alist for 百度/夸克/阿里云盘; Plex and/or Jellyfin.
 - **arr stack** — Prowlarr, Sonarr, Radarr, Bazarr, Jellyseerr, and **Decypharr** (a qBittorrent-shim that bridges *arr to Real-Debrid and symlinks the cached files into the library).
-- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + `danmu-bridge` (a small Go service in this repo: Sonarr/Radarr webhooks → Misaka, backfill, writes `<video>.xml` beside each symlink); Jellyfin web (dd-danmaku) and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale. Optionally **LibreTV** (web player for third-party sources, built from upstream + this repo's patch) shows Misaka's 弹幕 too, matched by title + episode.
+- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + `danmu-bridge` (a small Go service in this repo: Sonarr/Radarr webhooks → Misaka, backfill, writes `<video>.xml` beside each symlink); Jellyfin shows 弹幕 inside its own web player (script injected server-side, Misaka's API served on Jellyfin's own origin, so no CORS and no per-device install), and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale. Optionally **LibreTV** (web player for third-party sources, built from upstream + this repo's patch) shows Misaka's 弹幕 too, matched by title + episode.
 - **access** — a Tailscale sidecar per service → `https://<svc>.<tailnet>.ts.net`.
 - **safety net** — daily cron backup of all configs → Google Drive.
 

@@ -215,10 +215,75 @@ not in Sonarr:
 Then re-submit that series (`backfill` again, or refresh it in Misaka's UI).
 
 **7e. Players**
-- **Jellyfin web**: install the dd-danmaku userscript/extension (chen3861229
-  or l429609201 fork) and set its API to
-  `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`. Must be https — the
-  Jellyfin page is https and browsers block http calls from it.
+- **Jellyfin web, embedded** (also the Jellyfin Android app with its web
+  player, and Jellyfin iOS): 弹幕 shows inside Jellyfin's own player. Nothing is
+  installed per device and nobody is sent to another site. Two pieces:
+  the [jellyfin-danmaku](https://github.com/Izumiko/jellyfin-danmaku) script
+  (Izumiko, MIT; the Jellyfin port; the chen3861229 / l429609201 dd-danmaku
+  scripts are for Emby) is injected into Jellyfin's page at container start, and
+  Jellyfin's own sidecar serves Misaka's API under `/danmaku/` on the same
+  origin. The browser calls
+  `https://jellyfin.<tailnet>.ts.net/danmaku/api/v2/…`; tailscale serve strips
+  `/danmaku` and forwards to `http://misaka:7768/api/v1/<TOKEN>/api/v2/…`. Same
+  origin means no CORS and no mixed content, and the token never reaches the
+  browser.
+  1. Misaka: `弹幕` → `Token管理` → create a token just for Jellyfin.
+  2. `./jellyfin-ts/serve.json` gets a second handler (replace `<TOKEN>`; the
+     file now holds a secret, so `chmod 600` it). tailscaled watches the
+     directory and picks the change up without a restart:
+     ```json
+     {
+       "TCP": { "443": { "HTTPS": true } },
+       "Web": {
+         "${TS_CERT_DOMAIN}:443": {
+           "Handlers": {
+             "/":         { "Proxy": "http://127.0.0.1:8096" },
+             "/danmaku/": { "Proxy": "http://misaka:7768/api/v1/<TOKEN>" }
+           }
+         }
+       }
+     }
+     ```
+     `misaka` resolves because `misaka-ts` joins the `media-playback` network
+     (alias `misaka`) next to `jellyfin-ts`; `docker compose -p danmaku -f
+     docker-compose.danmaku.yml up -d` applies that after an upgrade from an
+     older compose file.
+  3. The injector, from this repo (root-owned and executable, or linuxserver's
+     init skips it):
+     ```bash
+     mkdir -p /mnt/data/media/jellyfin-init
+     install -o root -g root -m 755 <PATH_TO_THIS_REPO>/jellyfin/inject-danmaku.sh /mnt/data/media/jellyfin-init/
+     docker compose -p media -f docker-compose.yml --profile jellyfin up -d jellyfin
+     docker logs jellyfin 2>&1 | grep danmaku-inject    # "injected ede.js into …"
+     ```
+     The compose file mounts `./jellyfin-init` at `/custom-cont-init.d`; an empty
+     directory does nothing. The script is pinned to jellyfin-danmaku v1.62.0
+     (one commit, checked by sha256), downloaded once from
+     raw.githubusercontent.com and cached in `jellyfin-config/danmaku-web/`, then
+     re-injected on every start (a recreated container starts from a clean web
+     client). If GitHub is unreachable from the host, set `EDE_URL` on the
+     `jellyfin` service to a mirror of the same file, e.g.
+     `https://cdn.jsdelivr.net/gh/Izumiko/jellyfin-danmaku@9967db0a7d9c7f0ee1a1aef17fa610341f636169/ede.js`
+     (the hash is still checked), or put the file at
+     `jellyfin-config/danmaku-web/ede.js` yourself. Upgrade: set `EDE_COMMIT`
+     and `EDE_SHA256` (env on `jellyfin`, or edit the script).
+  4. Check: `curl -s "https://jellyfin.<tailnet>.ts.net/danmaku/api/v2/search/anime?keyword=<a title Misaka has>"`
+     returns Misaka's JSON. Then open Jellyfin (hard-refresh once), play an
+     episode: the 弹幕 toggle sits at the bottom left of the player, and
+     `设置` → `弹幕设置` shows 自定义API `/danmaku`.
+  - Open Jellyfin at `https://jellyfin.<tailnet>.ts.net`. `/danmaku/` exists
+    only on the sidecar, not on `http://<host>:8096`.
+  - The script defaults to `/danmaku` only in a browser that never saved its
+    own API setting. One that used the old setup keeps
+    `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`, which still works
+    (Misaka allows any origin) but is cross-origin; change 自定义API to
+    `/danmaku`. Remove any Tampermonkey copy of the script, or every comment
+    is drawn twice.
+  - In 御坂网络一键配置, "测试" first probes `/danmaku/api/health`, which is
+    not proxied, so that line fails; the search line after it is what counts.
+    Leave 使用本地xml弹幕 off (it needs jellyfin-plugin-danmu, see below).
+  - Jellyfin Media Player and the TV apps use their own bundled UI, so they get
+    no 弹幕 this way; use a dandanplay-compatible player there.
 - **SenPlayer / Hills / Afusekt / 小幻影视** (dandanplay-compatible): 自定义弹幕
   API → same URL. The device must be on the tailnet.
 - **Don't also install a Jellyfin danmaku *plugin* that downloads its own xml**

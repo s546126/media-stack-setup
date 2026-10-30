@@ -94,6 +94,9 @@ then uploads (including Misaka's DB dump, if deployed). Confirm a restore drill 
 Only if the user wants danmaku. Deploy Misaka + Postgres + the bridge as a
 separate compose project on the arr network, then wire Sonarr/Radarr webhooks,
 backfill the existing library, and point players at Misaka's dandanplay API.
+For Jellyfin web, embed it: inject **`jellyfin/inject-danmaku.sh`** via
+`./jellyfin-init` and add the `/danmaku/` handler to Jellyfin's sidecar
+serve.json (same origin, token server-side; no userscript, no CORS) — §7e.
 → Template **`references/compose-danmaku.yml`**, steps in **`references/wiring.md`** §7.
 The bridge lives in **`danmu-bridge/`** (Go source + Dockerfile; build the image
 locally, its README lists every env var) — use it, don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
