@@ -75,6 +75,9 @@ bash -n scripts/config-backup.sh
 ```
 
 CI also validates both templates with Docker Compose and runs ShellCheck.
+A second workflow (`images.yml`) builds the danmu-bridge and patched LibreTV
+images for linux/amd64 and linux/arm64 on native runners and smoke-tests them
+(build only, nothing is pushed to a registry).
 These checks do not replace the target-host playback, reboot and restore drills.
 
 ## Notes
