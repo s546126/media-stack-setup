@@ -20,7 +20,7 @@ first writes a `pg_dump` of Misaka's Postgres to `MEDIA_DIR/misaka-db.sql`, then
 also stops Misaka and danmu-bridge for the snapshot (Postgres keeps running) and
 archives `docker-compose.danmaku.yml`, `misaka-config` and `danmu-bridge-data`.
 Misaka's XML store (`misaka-config/danmaku`) is excluded: it can be large and is
-re-fetched by resubmitting (bridge backfill).
+re-fetched by resubmitting (bridge backfill). LibreTV keeps no server-side state.
 
 Set `MEDIA_PROJECT` / `ARR_PROJECT` / `DANMAKU_PROJECT` if your actual project names differ. Check
 `docker ps --format '{{.Names}} {{.Labels}}'` before the first run. FUSE containers, Tailscale sidecars and unrelated services remain running.
