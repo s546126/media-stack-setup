@@ -1,0 +1,14 @@
+{
+  "series": {"id": 2, "title": "Show", "path": "/tv/Show", "tvdbId": 100, "tmdbId": 200},
+  "episodes": [
+    {"episodeNumber": 1, "seasonNumber": 1},
+    {"episodeNumber": 2, "seasonNumber": 1},
+    {"episodeNumber": 3, "seasonNumber": 1}
+  ],
+  "episodeFiles": [
+    {"id": 1, "relativePath": "Season 01/Show - S01E01.mkv", "path": "/tv/Show/Season 01/Show - S01E01.mkv"},
+    {"id": 2, "relativePath": "Season 01/Show - s01e02.mkv"}
+  ],
+  "eventType": "Download",
+  "instanceName": "Sonarr"
+}

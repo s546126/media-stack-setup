@@ -4,13 +4,15 @@ description: >-
   Step-by-step guide to self-host a streaming media library on a single Linux
   box: Real-Debrid + zurg + rclone for remote streaming with local caching, the *arr stack
   (Sonarr/Radarr/Prowlarr/Bazarr/Jellyseerr) with a Decypharr debrid bridge for
-  full automation, Plex/Jellyfin playback with Chinese metadata, private
+  full automation, Plex/Jellyfin playback with Chinese metadata, optional
+  弹幕 (danmaku) via a Misaka danmu server fed by Sonarr/Radarr webhooks, private
   Tailscale access (no public exposure), and daily config backup. Use this
   whenever the user wants to build or deploy a self-hosted media server,
   Real-Debrid + Plex/Jellyfin, an *arr automation stack, zurg/rclone debrid
-  mounting, or asks about 影音库 / 媒体库 / 追剧自动化 / 串流看片 on a Linux or
-  Oracle Always Free machine — even if they only name one piece (e.g. "set up
-  Sonarr with Real-Debrid", "mount Real-Debrid into Plex", "zurg rclone docker").
+  mounting, or asks about 影音库 / 媒体库 / 追剧自动化 / 串流看片 / 弹幕 on a Linux
+  or Oracle Always Free machine — even if they only name one piece (e.g. "set up
+  Sonarr with Real-Debrid", "mount Real-Debrid into Plex", "zurg rclone docker",
+  "给 Jellyfin 加弹幕", "Misaka 弹幕服务器").
 ---
 
 # Media Stack Setup — Real-Debrid 串流影音库 + 全自动化
@@ -29,10 +31,14 @@ phase that needs them — keep this file as the map.
 ```
 求片/索引 → Sonarr/Radarr 决定抓什么 → Decypharr 加种到 Real-Debrid
   → zurg 串流挂载 /mnt/zurg → 符号链接进 library → Plex/Jellyfin 播放
+
+（可选）Sonarr/Radarr 导入 webhook → danmu-bridge → Misaka 抓弹幕
+  → <视频名>.xml 写在符号链接旁 ；播放端经 Tailscale 调 Misaka 弹弹play 接口
 ```
 
 - **media stack** (`docker-compose.yml`): zurg (RD client, :9999 WebDAV) → rclone FUSE mount `/mnt/zurg`; alist (optional 百度/夸克/阿里云盘, :5244) → rclone-alist `/mnt/alist`; Plex (:32400) and/or Jellyfin (same role — pick one or run both).
 - **arr stack** (`docker-compose.arr.yml`, separate compose project `arr`): Prowlarr :9696, Sonarr :8989, Radarr :7878, Bazarr :6767, Jellyseerr :5055, Decypharr :8282 (the RD bridge).
+- **danmaku stack** (`docker-compose.danmaku.yml`, separate project `danmaku`, optional): Misaka danmu server :7768 (UI + dandanplay API) + Postgres + `danmu-bridge` (Sonarr/Radarr webhook receiver, backfill, xml sync). Triggered by Sonarr/Radarr — the media server only plays.
 - **access**: a Tailscale sidecar per user-facing service → `https://<svc>.<tailnet>.ts.net`, nothing on the public internet.
 - **safety net**: daily cron backup of all configs → Google Drive (rclone).
 
@@ -82,7 +88,17 @@ download. → Section in **`references/wiring.md`** ("中文化").
 ### Phase 6 — config backup
 Configure and test **`scripts/config-backup.sh`** using **`references/backup.md`**.
 It briefly stops running stack containers for a consistent archive, restarts them,
-then uploads. Confirm a restore drill before scheduling cron.
+then uploads (including Misaka's DB dump, if deployed). Confirm a restore drill before scheduling cron.
+
+### Phase 7 — 弹幕 (optional)
+Only if the user wants danmaku. Deploy Misaka + Postgres + the bridge as a
+separate compose project on the arr network, then wire Sonarr/Radarr webhooks,
+backfill the existing library, and point players at Misaka's dandanplay API.
+→ Template **`references/compose-danmaku.yml`**, steps in **`references/wiring.md`** §7.
+The bridge lives in **`danmu-bridge/`** (Go source + Dockerfile; build the image
+locally, its README lists every env var) — use it, don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
+Verify: import one episode in Sonarr → Misaka task succeeds → `<video>.xml`
+appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
 
 ## Operating principles (apply throughout)
 
@@ -97,7 +113,9 @@ then uploads. Confirm a restore drill before scheduling cron.
 - `references/backup.md` — backup consistency, scheduling and restore
 - `references/compose-media.yml` — media stack template + setup notes
 - `references/compose-arr.yml` — arr automation stack template
-- `references/wiring.md` — API wiring, Decypharr RD bridge, root folders, 中文化
+- `references/compose-danmaku.yml` — optional 弹幕 layer (Misaka + Postgres + bridge)
+- `references/wiring.md` — API wiring, Decypharr RD bridge, root folders, 中文化, 弹幕 (§7)
 - `references/tailscale-sidecars.md` — userspace sidecar + serve pattern
 - `references/troubleshooting.md` — storage layout + real-world gotchas
 - `scripts/config-backup.sh` — daily config backup to Google Drive
+- `danmu-bridge/` — source of the Sonarr/Radarr → Misaka bridge (弹幕 layer)

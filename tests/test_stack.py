@@ -60,8 +60,10 @@ class Backup(unittest.TestCase):
 printf 'docker %s\\n' "$*" >> "$CALLS"
 if [ "$1" = ps ]; then
   if [ "$RUNNING" = 1 ]; then
-    case "$*" in *project=media*) printf "media-id plex\\nmount-id rclone\\nsidecar-id plex-ts\\n";; *project=arr*) echo "arr-id sonarr";; esac
+    case "$*" in *project=media*) printf "media-id plex\\nmount-id rclone\\nsidecar-id plex-ts\\n";; *project=arr*) echo "arr-id sonarr";;
+      *project=danmaku*) [ "${DANMAKU:-}" != 1 ] || printf "db-id misaka-db\\nmisaka-id misaka\\nts-id misaka-ts\\n";; esac
   fi
+elif [ "$1" = exec ]; then echo '-- pg_dump fixture'
 elif [ "$1" = "$FAIL" ]; then exit 1; fi
 ''')
         self.mock('rclone', '''
@@ -101,6 +103,26 @@ if [ "$1" = copyto ]; then tar -tzf "$2" > "$CALLS.archive"; fi
         self.assertIn('.env', listing)
         self.assertIn('--include /media-configs-*.tar.gz', calls)
         self.assertFalse(list(self.base.glob('media-backup.*')))
+
+    def test_danmaku_layer_dumps_misaka_and_skips_its_xml_store(self):
+        (self.media / 'misaka-config' / 'danmaku').mkdir(parents=True)
+        (self.media / 'misaka-config' / 'config.yml').write_text('fixture')
+        (self.media / 'misaka-config' / 'danmaku' / '1.xml').write_text('fixture')
+        (self.media / 'danmu-bridge-data').mkdir()
+        self.env['DANMAKU'] = '1'
+        result = self.run_backup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertLess(calls.index('docker exec db-id pg_dump'), calls.index('docker stop'))
+        stop = next(line for line in calls.splitlines() if line.startswith('docker stop'))
+        self.assertIn('misaka-id', stop)
+        self.assertNotIn('db-id', stop)
+        self.assertNotIn('ts-id', calls)
+        listing = Path(str(self.log) + '.archive').read_text()
+        self.assertIn('misaka-db.sql', listing)
+        self.assertIn('misaka-config/config.yml', listing)
+        self.assertIn('danmu-bridge-data', listing)
+        self.assertNotIn('misaka-config/danmaku', listing)
 
     def test_failed_upload_or_publish_never_prunes(self):
         for fail in ('copyto', 'moveto'):

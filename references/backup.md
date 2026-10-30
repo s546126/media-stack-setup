@@ -15,7 +15,14 @@ or tar triggers a restart attempt and fails the job. SIGKILL/power loss cannot
 run cleanup: check services after a terminated backup. No unrelated process may
 write these configuration directories during the snapshot.
 
-Set `MEDIA_PROJECT` / `ARR_PROJECT` if your actual project names differ. Check
+If the optional 弹幕 layer (Compose project `danmaku`) is running, the script
+first writes a `pg_dump` of Misaka's Postgres to `MEDIA_DIR/misaka-db.sql`, then
+also stops Misaka and danmu-bridge for the snapshot (Postgres keeps running) and
+archives `docker-compose.danmaku.yml`, `misaka-config` and `danmu-bridge-data`.
+Misaka's XML store (`misaka-config/danmaku`) is excluded: it can be large and is
+re-fetched by resubmitting (bridge backfill).
+
+Set `MEDIA_PROJECT` / `ARR_PROJECT` / `DANMAKU_PROJECT` if your actual project names differ. Check
 `docker ps --format '{{.Names}} {{.Labels}}'` before the first run. FUSE containers, Tailscale sidecars and unrelated services remain running.
 Custom app writers/config directories require extending the script's allowlists. Bind-mounted configs are archived; Docker named
 volumes (`zurgdata`, Tailscale identities) are **not**. After a full host loss,
@@ -63,5 +70,7 @@ tar -xzf file -C restore-check
 Verify configuration and database integrity in that directory before replacing
 live data. Stop the target apps before copying restored configs into `MEDIA_DIR`,
 preserve required ownership/permissions, and start only the restored services.
+Restore Misaka's database after `up -d misaka-db` with
+`docker exec -i misaka-db psql -U danmuapi -d danmuapi < misaka-db.sql`.
 Recreate mount preparation, named volumes and secrets as needed. Never extract
 an unreviewed archive directly over `/` or a running deployment.

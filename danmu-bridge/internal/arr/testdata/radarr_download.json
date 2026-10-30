@@ -1,0 +1,8 @@
+{
+  "movie": {"id": 3, "title": "你的名字。", "year": 2016, "folderPath": "/mnt/data/library/movies/Your Name (2016)", "tmdbId": 372058, "imdbId": "tt5311514"},
+  "remoteMovie": {"tmdbId": 372058, "imdbId": "tt5311514", "title": "Your Name", "year": 2016},
+  "movieFile": {"id": 9, "relativePath": "Your Name (2016) [Bluray-1080p].mkv", "path": "/mnt/data/library/movies/Your Name (2016)/Your Name (2016) [Bluray-1080p].mkv", "quality": "Bluray-1080p"},
+  "isUpgrade": true,
+  "eventType": "Download",
+  "instanceName": "Radarr"
+}

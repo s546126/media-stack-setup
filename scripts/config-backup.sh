@@ -10,6 +10,7 @@ RETENTION_DAYS=${RETENTION_DAYS:-14}
 BACKUP_TMP_DIR=${BACKUP_TMP_DIR:-/var/tmp}
 MEDIA_PROJECT=${MEDIA_PROJECT:-media}
 ARR_PROJECT=${ARR_PROJECT:-arr}
+DANMAKU_PROJECT=${DANMAKU_PROJECT:-danmaku}
 [[ $RETENTION_DAYS =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid RETENTION_DAYS' >&2; exit 1; }
 [[ $REMOTE_DIR == *:* && $REMOTE_DIR != *$'\n'* ]] || { echo 'Expected rclone remote:path' >&2; exit 1; }
 for tool in docker rclone tar mktemp flock; do
@@ -45,30 +46,43 @@ trap 'exit 143' TERM
 paths=(docker-compose.yml docker-compose.arr.yml)
 for path in .env zurg alist plex-config jellyfin-config prowlarr-config sonarr-config \
   radarr-config bazarr-config jellyseerr-config decypharr-config lidarr-config \
-  qbittorrent-config navidrome-data; do
+  qbittorrent-config navidrome-data docker-compose.danmaku.yml misaka-config \
+  danmu-bridge-data; do
   [[ ! -e $path ]] || paths+=("$path")
 done
 for path in *-ts; do
   [[ ! -d $path ]] || paths+=("$path")
 done
 
+# Danmaku layer (optional): dump Misaka's Postgres while it is still running;
+# a live database directory is not a consistent copy.
+format='{{.ID}} {{.Label "com.docker.compose.service"}}'
+danmaku_ids=$(docker ps --format "$format" --filter "label=com.docker.compose.project=$DANMAKU_PROJECT")
+while read -r id service; do
+  if [[ $service == misaka-db ]]; then
+    docker exec "$id" pg_dump -U danmuapi -d danmuapi --clean --if-exists > misaka-db.sql.tmp
+    mv misaka-db.sql.tmp misaka-db.sql
+    paths+=(misaka-db.sql)
+  fi
+done <<< "$danmaku_ids"
+
 # Stop only writers of the included app configs. Leave FUSE and network
 # sidecars running so a backup cannot detach mounts or interrupt unrelated apps.
-format='{{.ID}} {{.Label "com.docker.compose.service"}}'
 ids=$(docker ps --format "$format" --filter "label=com.docker.compose.project=$MEDIA_PROJECT")
 arr_ids=$(docker ps --format "$format" --filter "label=com.docker.compose.project=$ARR_PROJECT")
 while read -r id service; do
   case "$service" in
-    alist|plex|jellyfin|prowlarr|sonarr|radarr|bazarr|jellyseerr|decypharr|lidarr|qbittorrent|navidrome)
+    alist|plex|jellyfin|prowlarr|sonarr|radarr|bazarr|jellyseerr|decypharr|lidarr|qbittorrent|navidrome|misaka|danmu-bridge)
       stopped+=("$id") ;;
   esac
-done <<< "$ids${arr_ids:+$'\n'$arr_ids}"
+done <<< "$ids${arr_ids:+$'\n'$arr_ids}${danmaku_ids:+$'\n'$danmaku_ids}"
 if ((${#stopped[@]})); then
   docker stop --time 60 "${stopped[@]}" >/dev/null
 fi
 archive="$stage/configs.tar.gz"
 tar -czf "$archive" --exclude='*/cache' --exclude='*/Cache' \
-  --exclude='*/logs' --exclude='*/log' --exclude='*.log' -- "${paths[@]}"
+  --exclude='*/logs' --exclude='*/log' --exclude='*.log' \
+  --exclude='misaka-config/danmaku' -- "${paths[@]}"
 tar -tzf "$archive" >/dev/null
 if ((${#stopped[@]})); then
   docker start "${stopped[@]}" >/dev/null
