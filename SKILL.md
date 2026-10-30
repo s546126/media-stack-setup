@@ -38,7 +38,7 @@ phase that needs them — keep this file as the map.
 
 - **media stack** (`docker-compose.yml`): zurg (RD client, :9999 WebDAV) → rclone FUSE mount `/mnt/zurg`; alist (optional 百度/夸克/阿里云盘, :5244) → rclone-alist `/mnt/alist`; Plex (:32400) and/or Jellyfin (same role — pick one or run both).
 - **arr stack** (`docker-compose.arr.yml`, separate compose project `arr`): Prowlarr :9696, Sonarr :8989, Radarr :7878, Bazarr :6767, Jellyseerr :5055, Decypharr :8282 (the RD bridge).
-- **danmaku stack** (`docker-compose.danmaku.yml`, separate project `danmaku`, optional): Misaka danmu server :7768 (UI + dandanplay API) + Postgres + `danmu-bridge` (Sonarr/Radarr webhook receiver, backfill, xml sync). Triggered by Sonarr/Radarr — the media server only plays.
+- **danmaku stack** (`docker-compose.danmaku.yml`, separate project `danmaku`, optional): Misaka danmu server :7768 (UI + dandanplay API) + Postgres + `danmu-bridge` (Sonarr/Radarr webhook receiver, backfill, xml sync). Triggered by Sonarr/Radarr — the media server only plays. Optional profile `libretv`: LibreTV :8080 (web player for third-party sources) whose server asks Misaka for 弹幕 by title + episode.
 - **access**: a Tailscale sidecar per user-facing service → `https://<svc>.<tailnet>.ts.net`, nothing on the public internet.
 - **safety net**: daily cron backup of all configs → Google Drive (rclone).
 
@@ -99,6 +99,8 @@ The bridge lives in **`danmu-bridge/`** (Go source + Dockerfile; build the image
 locally, its README lists every env var) — use it, don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
 Verify: import one episode in Sonarr → Misaka task succeeds → `<video>.xml`
 appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
+Only if the user also wants LibreTV: build **`libretv/`** (upstream pinned +
+`danmaku.patch`) and start the `libretv` profile — **`references/wiring.md`** §7f.
 
 ## Operating principles (apply throughout)
 
@@ -119,3 +121,4 @@ appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
 - `references/troubleshooting.md` — storage layout + real-world gotchas
 - `scripts/config-backup.sh` — daily config backup to Google Drive
 - `danmu-bridge/` — source of the Sonarr/Radarr → Misaka bridge (弹幕 layer)
+- `libretv/` — LibreTV Dockerfile + danmaku patch, pinned upstream commit (optional)

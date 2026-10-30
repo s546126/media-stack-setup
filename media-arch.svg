@@ -29,19 +29,24 @@
   <!-- ===== OPTIONAL DANMAKU LAYER ===== -->
   <rect x="40" y="118" width="520" height="100" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5 3"/>
   <text x="54" y="136" font-size="12.5" font-weight="700" fill="#9a3412">弹幕层（可选）· danmaku 栈</text>
-  <rect x="56" y="146" width="90" height="40" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="1.3"/>
-  <text x="101" y="171" font-size="11" font-weight="600" fill="#9a3412" text-anchor="middle">Postgres</text>
-  <rect x="156" y="146" width="180" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
-  <text x="246" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">Misaka :7768 (+ts)</text>
-  <text x="246" y="179" font-size="10" fill="#c2410c" text-anchor="middle">抓弹幕 · 弹弹play 接口</text>
-  <rect x="376" y="146" width="170" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
-  <text x="461" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">danmu-bridge</text>
-  <text x="461" y="179" font-size="10" fill="#c2410c" text-anchor="middle">webhook · backfill · xml 同步</text>
-  <line x1="146" y1="166" x2="156" y2="166" stroke="#ea580c" stroke-width="1.4"/>
-  <line x1="376" y1="166" x2="338" y2="166" stroke="#ea580c" stroke-width="1.6" marker-end="url(#arO)"/>
-  <text x="56" y="206" font-size="10.5" fill="#c2410c">xml → 符号链接旁 · 播放端经 Tailscale 拉弹幕</text>
-  <line x1="461" y1="267" x2="461" y2="188" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arO)" stroke-dasharray="4 3"/>
-  <text x="468" y="232" font-size="10.5" fill="#c2410c">导入 webhook</text>
+  <rect x="56" y="146" width="60" height="40" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="1.3"/>
+  <text x="86" y="171" font-size="11" font-weight="600" fill="#9a3412" text-anchor="middle">Postgres</text>
+  <rect x="124" y="146" width="150" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="199" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">Misaka :7768 (+ts)</text>
+  <text x="199" y="179" font-size="10" fill="#c2410c" text-anchor="middle">抓弹幕 · 弹弹play 接口</text>
+  <rect x="284" y="146" width="142" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="355" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">danmu-bridge</text>
+  <text x="355" y="179" font-size="10" fill="#c2410c" text-anchor="middle">webhook · backfill · xml</text>
+  <rect x="434" y="146" width="112" height="40" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="1.3" stroke-dasharray="4 2"/>
+  <text x="490" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">LibreTV (+ts)</text>
+  <text x="490" y="179" font-size="10" fill="#c2410c" text-anchor="middle">网页看采集站</text>
+  <line x1="116" y1="166" x2="124" y2="166" stroke="#ea580c" stroke-width="1.4"/>
+  <line x1="284" y1="166" x2="276" y2="166" stroke="#ea580c" stroke-width="1.6" marker-end="url(#arO)"/>
+  <polyline points="490,186 490,194 214,194 214,189" fill="none" stroke="#ea580c" stroke-width="1.4" stroke-dasharray="3 2" marker-end="url(#arO)"/>
+  <text x="366" y="206" font-size="10" fill="#c2410c">LibreTV 按剧名+集数取</text>
+  <text x="56" y="210" font-size="10.5" fill="#c2410c">xml → 符号链接旁 · 播放端经 Tailscale 拉弹幕</text>
+  <line x1="355" y1="267" x2="355" y2="188" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arO)" stroke-dasharray="4 3"/>
+  <text x="362" y="232" font-size="10.5" fill="#c2410c">导入 webhook</text>
 
   <!-- ===== STAGE HEADERS ===== -->
   <text x="139"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">① 入口</text>
@@ -151,7 +156,7 @@
   <line x1="996" y1="528" x2="1010" y2="528" stroke="#475569" stroke-width="1.6" marker-end="url(#ar)"/>
 
   <text x="56" y="592" font-size="11" fill="#64748b">单机 = 单点；boot 200G；影片在 Real-Debrid / 云盘，不落本地盘；docker 容器 restart=unless-stopped 开机自启。</text>
-  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈按需启用 Plex/Jellyfin/alist + arr 栈 6 容器（+ 可选弹幕栈 4 容器）；共享 /mnt 路径与 playback 网络，Tailscale 提供私网访问。</text>
+  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈按需启用 Plex/Jellyfin/alist + arr 栈 6 容器（+ 可选弹幕栈 4 容器，另可选 LibreTV 2 容器）；共享 /mnt 路径与 playback 网络，Tailscale 提供私网访问。</text>
   <text x="56" y="636" font-size="11" fill="#64748b">访问：每个服务都有独立 tailscale 节点，内网 https://&lt;服务名&gt;.&lt;你的tailnet&gt;.ts.net 直达，无公网暴露。</text>
 
   <!-- ===== HUNTER ===== -->

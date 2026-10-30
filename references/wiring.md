@@ -228,6 +228,33 @@ Then re-submit that series (`backfill` again, or refresh it in Misaka's UI).
 - Players that read a sidecar `<video>.xml` from the library get danmaku with
   no API at all — that's what the bridge's sync is for.
 
+**7f. LibreTV web player with danmaku** *(optional)*
+
+[LibreTV](https://github.com/LibreSpark/LibreTV) searches third-party video
+sources and plays them in the browser; it is not a front end for this library.
+This repo builds it from a pinned upstream commit plus `libretv/danmaku.patch`,
+which makes its server ask Misaka for each episode's danmaku by title + episode
+number (`/match`, then `/search/episodes`, then `/comment`). Details and limits:
+`libretv/README.md`.
+
+- In Misaka: `设置` → turn on **后备匹配** (match fallback) so shows that aren't
+  in the library get searched and imported on first play. If you restricted
+  fallback to certain tokens, add LibreTV's token there.
+- `弹幕` → `Token管理` → create a token just for LibreTV → `MISAKA_TOKEN`.
+- `./libretv-ts/serve.json`: the serve.json from tailscale-sidecars.md with
+  `"Proxy": "http://127.0.0.1:8080"`.
+- Set `PASSWORD` and `MISAKA_TOKEN` in the `libretv` service, then:
+
+```bash
+docker build -t libretv-danmaku:latest <PATH_TO_THIS_REPO>/libretv
+docker compose -p danmaku -f docker-compose.danmaku.yml --profile libretv up -d
+```
+
+Open `https://libretv.<tailnet>.ts.net`, log in, add a 采集站 in its settings
+(or preset them with `DEFAULT_SOURCES`) if none is listed, play an episode. A hint like `弹幕 1234 条 · <title> 第5集`
+shows when danmaku loaded. A show Misaka has never seen can take tens of seconds
+the first time. Wrong show or wrong episode: fix it in Misaka as in 7d.
+
 ---
 
 ## Verify the whole pipeline

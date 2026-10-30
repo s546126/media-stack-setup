@@ -15,4 +15,4 @@ jobs:
       - run: bash -n scripts/config-backup.sh && shellcheck scripts/config-backup.sh
       - run: docker compose -p media -f references/compose-media.yml --profile plex --profile jellyfin --profile alist config --quiet
       - run: docker compose -p arr -f references/compose-arr.yml config --quiet
-      - run: docker compose -p danmaku -f references/compose-danmaku.yml config --quiet
+      - run: docker compose -p danmaku -f references/compose-danmaku.yml --profile libretv config --quiet

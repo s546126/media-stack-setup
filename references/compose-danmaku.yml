@@ -11,6 +11,11 @@
 #   docker build -t danmu-bridge:latest <PATH_TO_THIS_REPO>/danmu-bridge
 #   docker compose -p danmaku -f docker-compose.danmaku.yml config   # validate
 #   docker compose -p danmaku -f docker-compose.danmaku.yml up -d
+# Optional LibreTV web player with Misaka danmaku (profile `libretv`, not
+# started by the plain `up -d` above):
+#   mkdir -p libretv-ts   # serve.json proxying to http://127.0.0.1:8080
+#   docker build -t libretv-danmaku:latest <PATH_TO_THIS_REPO>/libretv
+#   docker compose -p danmaku -f docker-compose.danmaku.yml --profile libretv up -d
 # ----------------------------------------------------------------------------
 # How it fits (Jellyfin/Plex only PLAY; they don't trigger anything here):
 #   new imports : Sonarr/Radarr "On Import" webhook → danmu-bridge → Misaka
@@ -23,7 +28,10 @@
 #   playback    : Jellyfin web (dd-danmaku script) and dandanplay-compatible
 #                 clients (SenPlayer, Hills, …) call Misaka's dandanplay API over
 #                 Tailscale: https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>
-# Wiring steps: references/wiring.md §7.
+#   libretv     : (optional) LibreTV plays third-party sources in the browser;
+#                 its server asks Misaka by title + episode number for danmaku
+#                 (http://misaka:7768, token stays server-side)
+# Wiring steps: references/wiring.md §7 (LibreTV: §7f).
 #
 # KEY POINTS:
 #   - Joins the arr stack's network (`arr_default`, external here) so Sonarr/
@@ -43,6 +51,9 @@
 #     (stdlib only, multi-arch Dockerfile, runs on ARM). No published image:
 #     build it locally as above. danmu-bridge/README.md documents every env var
 #     (sync interval, ID source, path mapping, …) and the webhook auth.
+#   - libretv is upstream LibreTV pinned to one commit + this repo's
+#     libretv/danmaku.patch, built locally from libretv/ (libretv/README.md).
+#     Stateless (history lives in the browser), so nothing to back up.
 # ============================================================================
 
 services:
@@ -129,6 +140,43 @@ services:
     # no ports: Sonarr/Radarr reach http://danmu-bridge:8090 over the network
     depends_on: [ misaka ]
 
+  # ---- optional: LibreTV web player with Misaka danmaku (profile libretv) ----
+  libretv-ts:
+    image: tailscale/tailscale:latest
+    container_name: libretv-ts
+    restart: unless-stopped
+    profiles: [ libretv ]
+    hostname: libretv
+    environment:
+      - TS_HOSTNAME=libretv
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8080
+    networks:
+      default:
+        aliases: [ libretv ]
+    volumes:
+      - tailscale-libretv:/var/lib/tailscale
+      - ./libretv-ts:/config
+
+  libretv:
+    image: libretv-danmaku:latest           # built locally from libretv/, or instead:
+    # build: <PATH_TO_THIS_REPO>/libretv
+    container_name: libretv
+    restart: unless-stopped
+    profiles: [ libretv ]
+    network_mode: "service:libretv-ts"
+    environment:
+      - TZ=UTC
+      - PASSWORD=<YOUR_LIBRETV_PASSWORD>      # LibreTV's own login
+      - MISAKA_URL=http://misaka:7768         # via misaka-ts's alias on this network
+      - MISAKA_TOKEN=<YOUR_MISAKA_TOKEN>      # Misaka UI → 弹幕 → Token管理, one just for LibreTV
+      # optional: PROXY_SECRET=<openssl rand -hex 32> (else derived from PASSWORD),
+      # DEFAULT_SOURCES / DEFAULT_SUBSCRIPTIONS (see upstream README)
+    # no ports: reach it at https://libretv.<tailnet>.ts.net
+    depends_on: [ libretv-ts, misaka ]
+
 networks:
   default:
     name: arr_default
@@ -136,3 +184,4 @@ networks:
 
 volumes:
   tailscale-misaka:
+  tailscale-libretv:

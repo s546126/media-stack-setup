@@ -121,6 +121,14 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
   `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`. If the browser console shows
   a CORS error, that's between the script and Misaka — check both projects'
   current notes; this repo hasn't verified CORS behavior.
+- **LibreTV plays but shows no danmaku**: `docker logs libretv` and, in the
+  browser, the `/api/danmaku` response. `enabled:false` means `MISAKA_URL` or
+  `MISAKA_TOKEN` isn't set; a 502 means LibreTV can't reach Misaka (it must be on
+  `arr_default` and reach `http://misaka:7768`); `comments:[]` with no
+  `matched` means Misaka found nothing — turn on 后备匹配, check the token is
+  allowed to use it, and check Misaka's task list. Wrong show: fix in Misaka.
+- **`docker build` of libretv fails at `git apply`**: `LIBRETV_COMMIT` was
+  changed without rebasing the patch — see `libretv/README.md`.
 - **Misaka won't start**: it needs MySQL or Postgres (no SQLite). With
   `postgres:18` the volume is `/var/lib/postgresql` (not `.../data`); a wrong
   path or a dir not owned by 1000:1000 shows up in `docker logs misaka-db`.
