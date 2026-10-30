@@ -7,6 +7,8 @@
 #   chown 1000:1000 misaka-db danmu-bridge-data
 #   # misaka-ts/serve.json = the serve.json from tailscale-sidecars.md with
 #   # "Proxy": "http://127.0.0.1:7768"
+#   # build the bridge image from this repo's danmu-bridge/ (no published image):
+#   docker build -t danmu-bridge:latest <PATH_TO_THIS_REPO>/danmu-bridge
 #   docker compose -p danmaku -f docker-compose.danmaku.yml config   # validate
 #   docker compose -p danmaku -f docker-compose.danmaku.yml up -d
 # ----------------------------------------------------------------------------
@@ -37,10 +39,10 @@
 #     browser script calling plain-http Misaka is blocked as mixed content.
 #   - Image/ports/paths below are from Misaka's own docs + source
 #     (github.com/l429609201/misaka_danmu_server); multi-arch, runs on ARM.
-#   - danmu-bridge is a small Go service maintained separately (not in this
-#     repo). No published image yet: build it from its source dir
-#     (`docker build -t danmu-bridge:latest .`, multi-arch Dockerfile). Its own
-#     README is the reference for the env vars and webhook auth used below.
+#   - danmu-bridge is the small Go service in this repo's `danmu-bridge/`
+#     (stdlib only, multi-arch Dockerfile, runs on ARM). No published image:
+#     build it locally as above. danmu-bridge/README.md documents every env var
+#     (sync interval, ID source, path mapping, …) and the webhook auth.
 # ============================================================================
 
 services:
@@ -107,8 +109,8 @@ services:
       misaka-ts: { condition: service_started }
 
   danmu-bridge:
-    image: danmu-bridge:latest              # built locally from the bridge's source:
-    # build: <PATH_TO_DANMU_BRIDGE_SOURCE>
+    image: danmu-bridge:latest              # built locally from danmu-bridge/, or instead:
+    # build: <PATH_TO_THIS_REPO>/danmu-bridge
     container_name: danmu-bridge
     restart: unless-stopped
     user: "1000:1000"                       # same owner as the linuxserver containers

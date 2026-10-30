@@ -170,8 +170,14 @@ Jellyfin/Plex only play.
 - Misaka scrapes Chinese video sites. From a non-China host some sources
   geo-block or time out — set `设置` → `代理配置` if your sources come back empty.
 
-Put the API key into `docker-compose.danmaku.yml`, then
-`docker compose -p danmaku -f docker-compose.danmaku.yml up -d danmu-bridge`.
+Put the API key into `docker-compose.danmaku.yml`, build the bridge from this
+repo's `danmu-bridge/` and start it:
+
+```bash
+docker build -t danmu-bridge:latest <PATH_TO_THIS_REPO>/danmu-bridge
+docker compose -p danmaku -f docker-compose.danmaku.yml up -d danmu-bridge
+```
+What it does, every env var and its limits: `danmu-bridge/README.md`.
 
 **7b. Sonarr/Radarr → bridge webhooks**
 

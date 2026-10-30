@@ -1,0 +1,10 @@
+{
+  "series": {"id": 1, "title": "葬送的芙莉莲", "titleSlug": "frieren", "path": "/mnt/data/library/tv/Frieren (2023)", "tvdbId": 424536, "tvMazeId": 68135, "tmdbId": 209867, "imdbId": "tt22248376", "type": "anime", "year": 2023},
+  "episodes": [{"id": 101, "episodeNumber": 5, "seasonNumber": 2, "title": "第5话", "seriesId": 1, "tvdbId": 999}],
+  "episodeFile": {"id": 55, "relativePath": "Season 02/Frieren (2023) - S02E05 - 第5话 [WEBDL-1080p].mkv", "path": "/mnt/data/library/tv/Frieren (2023)/Season 02/Frieren (2023) - S02E05 - 第5话 [WEBDL-1080p].mkv", "quality": "WEBDL-1080p", "size": 1400000000},
+  "isUpgrade": false,
+  "downloadClient": "Decypharr",
+  "eventType": "Download",
+  "instanceName": "Sonarr",
+  "applicationUrl": ""
+}

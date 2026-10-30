@@ -93,8 +93,8 @@ Only if the user wants danmaku. Deploy Misaka + Postgres + the bridge as a
 separate compose project on the arr network, then wire Sonarr/Radarr webhooks,
 backfill the existing library, and point players at Misaka's dandanplay API.
 → Template **`references/compose-danmaku.yml`**, steps in **`references/wiring.md`** §7.
-The bridge (`danmu-bridge`) is a separate small service — use its image/README;
-don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
+The bridge lives in **`danmu-bridge/`** (Go source + Dockerfile; build the image
+locally, its README lists every env var) — use it, don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
 Verify: import one episode in Sonarr → Misaka task succeeds → `<video>.xml`
 appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
 
@@ -114,3 +114,4 @@ appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
 - `references/tailscale-sidecars.md` — userspace sidecar + serve pattern
 - `references/troubleshooting.md` — storage layout + real-world gotchas
 - `scripts/config-backup.sh` — daily config backup to Google Drive
+- `danmu-bridge/` — source of the Sonarr/Radarr → Misaka bridge (弹幕 layer)

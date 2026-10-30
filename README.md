@@ -23,7 +23,7 @@ internet); configs back up daily to Google Drive.
 
 - **media stack** — zurg (RD client) → rclone FUSE mount `/mnt/zurg`; optional alist for 百度/夸克/阿里云盘; Plex and/or Jellyfin.
 - **arr stack** — Prowlarr, Sonarr, Radarr, Bazarr, Jellyseerr, and **Decypharr** (a qBittorrent-shim that bridges *arr to Real-Debrid and symlinks the cached files into the library).
-- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + a small Sonarr/Radarr→Misaka bridge; Jellyfin web (dd-danmaku) and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale.
+- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + `danmu-bridge` (a small Go service in this repo: Sonarr/Radarr webhooks → Misaka, backfill, writes `<video>.xml` beside each symlink); Jellyfin web (dd-danmaku) and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale.
 - **access** — a Tailscale sidecar per service → `https://<svc>.<tailnet>.ts.net`.
 - **safety net** — daily cron backup of all configs → Google Drive.
 
@@ -39,6 +39,7 @@ internet); configs back up daily to Google Drive.
 | [`references/tailscale-sidecars.md`](references/tailscale-sidecars.md) | Private access via userspace sidecar + `serve` (keeps the arr mesh working) |
 | [`references/troubleshooting.md`](references/troubleshooting.md) | Real-world gotchas (symlink path consistency, SELinux 203/EXEC, storage layout, 弹幕, …) |
 | [`scripts/config-backup.sh`](scripts/config-backup.sh) | Daily config backup → Google Drive |
+| [`danmu-bridge/`](danmu-bridge/) | Go source + Dockerfile for the Sonarr/Radarr → Misaka bridge (弹幕 layer) |
 | [`media-arch.svg`](media-arch.svg) | The architecture diagram above |
 
 ## Use it as a Claude Code skill
