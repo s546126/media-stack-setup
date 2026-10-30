@@ -133,7 +133,7 @@
   <line x1="996" y1="528" x2="1010" y2="528" stroke="#475569" stroke-width="1.6" marker-end="url(#ar)"/>
 
   <text x="56" y="592" font-size="11" fill="#64748b">单机 = 单点；boot 200G；影片在 Real-Debrid / 云盘，不落本地盘；docker 容器 restart=unless-stopped 开机自启。</text>
-  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈 8 容器（zurg/rclone/alist/plex/jellyfin…）+ arr 栈 6 容器，跨栈走宿主机 /mnt 路径 + tailscale 黏合。</text>
+  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈按需启用 Plex/Jellyfin/alist + arr 栈 6 容器；共享 /mnt 路径与 playback 网络，Tailscale 提供私网访问。</text>
   <text x="56" y="636" font-size="11" fill="#64748b">访问：每个服务都有独立 tailscale 节点，内网 https://&lt;服务名&gt;.&lt;你的tailnet&gt;.ts.net 直达，无公网暴露。</text>
 
   <!-- ===== HUNTER ===== -->

@@ -5,6 +5,9 @@ them. Most steps are doable via each app's REST API — the API key is in
 `<app>-config/config.xml` (`grep -oE '<ApiKey>[^<]+' .../config.xml`). API-key
 calls work even before you set up UI login.
 
+Set `HOST=127.0.0.1` for default bindings. Before POSTing, GET the endpoint and
+reuse existing root folders/applications to avoid duplicate entries.
+
 Replace `$HOST` with how you reach the apps (the tailscale IP, or `localhost`
 if you bind there). Container-to-container, apps use names (`sonarr`, `decypharr`).
 
@@ -21,49 +24,37 @@ if you bind there). Container-to-container, apps use names (`sonarr`, `decypharr
 
 ## 1. Decypharr — the Real-Debrid bridge
 
-Decypharr writes `config.json` to its `/app` volume on first boot. Set:
-- `download_folder` → the shared symlink library (e.g. `/mnt/data/media/library`)
-- `use_auth` → `false` (it's on a private tailnet; simplifies the qbit client)
-- add a `debrids` entry for Real-Debrid
+Use Decypharr's UI for the installed image version; its config schema can change.
+Back up the generated config before edits, and stop the app for manual file edits.
+Configure Real-Debrid with its API token and the existing zurg mount at
+`/mnt/zurg/__all__`. Select the external mount/symlink workflow; do not enable a
+second downloader or copy workflow by accident.
 
-Either use its web UI at `:8282` (add debrid → Real-Debrid → paste token →
-folder `/mnt/zurg/__all__`), or edit `config.json` (back it up first; a bad
-schema stops the container — revert if so):
+- Use `/mnt/data/media/downloads` for staging; keep it separate from the final
+  Sonarr/Radarr roots `/mnt/data/media/library/{tv,movies}`.
+- Select the symlink download action (`default_download_action` on versions
+  supporting that field) and confirm a test job produces actual symlinks.
+- Keep authentication enabled; enter the matching credentials in the *arr
+  qBittorrent client. A private tailnet is not an application login boundary.
+- Verify the configured folder exists **inside Decypharr** before searching.
+  Do not assume the image's defaults or a successful container start prove this.
 
-```bash
-CFG=/mnt/data/media/decypharr-config/config.json
-cp "$CFG" "$CFG.bak"
-RDTOKEN=$(grep -E '^token:' /mnt/data/media/zurg/config.yml | awk '{print $2}')
-RDTOKEN="$RDTOKEN" python3 - <<'PY'
-import json, os
-p = "/mnt/data/media/decypharr-config/config.json"
-d = json.load(open(p))
-d["download_folder"] = "/mnt/data/media/library"
-d["use_auth"] = False
-d["debrids"] = [{
-    "name": "realdebrid",
-    "api_key": os.environ["RDTOKEN"],
-    "folder": "/mnt/zurg/__all__",      # where zurg exposes every torrent by name
-    "rate_limit": "250/minute",
-}]
-json.dump(d, open(p, "w"), indent=2)
-print("decypharr configured")
-PY
-docker restart decypharr
-# verify: logs should show "debrids=1" and "Initial sync ... completed", healthy
-docker logs --since 40s decypharr 2>&1 | grep -iE "debrids=|error|panic"
-```
+Create the downloads directory writable by the configured app UID/GID. After
+saving, use the client Test buttons and inspect redacted logs for successful RD
+sync. The *arr import must preserve symlinks: disable hardlink/copy behavior as
+required by the installed Decypharr integration and verify with a real test
+release. A full local media file means the streaming workflow has not passed.
 
 ## 2. Root folders (Sonarr/Radarr)
 
 These are where the curated library lives — the same dir the media servers read.
 
 ```bash
-SK=<sonarr_apikey>; RK=<radarr_apikey>
+SK='REPLACE_WITH_SONARR_API_KEY'; RK='REPLACE_WITH_RADARR_API_KEY'
 mkdir -p /mnt/data/media/library/tv /mnt/data/media/library/movies
-curl -s -X POST "http://$HOST:8989/api/v3/rootfolder" -H "X-Api-Key: $SK" \
+curl --fail-with-body -sS -X POST "http://$HOST:8989/api/v3/rootfolder" -H "X-Api-Key: $SK" \
   -H 'Content-Type: application/json' -d '{"path":"/mnt/data/media/library/tv"}'
-curl -s -X POST "http://$HOST:7878/api/v3/rootfolder" -H "X-Api-Key: $RK" \
+curl --fail-with-body -sS -X POST "http://$HOST:7878/api/v3/rootfolder" -H "X-Api-Key: $RK" \
   -H 'Content-Type: application/json' -d '{"path":"/mnt/data/media/library/movies"}'
 ```
 
@@ -72,22 +63,12 @@ curl -s -X POST "http://$HOST:7878/api/v3/rootfolder" -H "X-Api-Key: $RK" \
 Add Decypharr as a qBittorrent client (host = container name `decypharr`, port 8282).
 **Radarr requires `priority` ≥ 1** (a value of 0 fails validation — Sonarr tolerates it).
 
-```bash
-# Sonarr
-curl -s -X POST "http://$HOST:8989/api/v3/downloadclient" -H "X-Api-Key: $SK" \
- -H 'Content-Type: application/json' -d '{"enable":true,"name":"decypharr",
- "implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent",
- "fields":[{"name":"host","value":"decypharr"},{"name":"port","value":8282},
- {"name":"useSsl","value":false},{"name":"username","value":""},{"name":"password","value":""},
- {"name":"tvCategory","value":"sonarr"}]}'
-# Radarr  (note priority:1 and movieCategory)
-curl -s -X POST "http://$HOST:7878/api/v3/downloadclient" -H "X-Api-Key: $RK" \
- -H 'Content-Type: application/json' -d '{"enable":true,"name":"decypharr","priority":1,
- "implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent",
- "fields":[{"name":"host","value":"decypharr"},{"name":"port","value":8282},
- {"name":"useSsl","value":false},{"name":"username","value":""},{"name":"password","value":""},
- {"name":"movieCategory","value":"radarr"}]}'
-```
+In each app's Settings → Download Clients, choose qBittorrent and enter
+`decypharr:8282`, the credentials configured in Decypharr, and category `sonarr`
+or `radarr`. Set priority to 1 and use **Test** before saving. Retrieve the
+installed app's `/api/v3/downloadclient/schema` if automating this: field names
+and authentication requirements are version-specific. Do not submit empty
+credentials or repeat POSTs without checking existing clients.
 
 ## 4. Prowlarr → applications + indexers
 
@@ -95,8 +76,8 @@ Add Sonarr & Radarr as Prowlarr "applications" so indexers auto-sync to them.
 (Internal URLs use container names; the API call below works once all are up.)
 
 ```bash
-PK=<prowlarr_apikey>
-curl -s -X POST "http://$HOST:9696/api/v1/applications" -H "X-Api-Key: $PK" \
+PK='REPLACE_WITH_PROWLARR_API_KEY'
+curl --fail-with-body -sS -X POST "http://$HOST:9696/api/v1/applications" -H "X-Api-Key: $PK" \
  -H 'Content-Type: application/json' -d '{"name":"Sonarr","syncLevel":"fullSync",
  "implementation":"Sonarr","implementationName":"Sonarr","configContract":"SonarrSettings",
  "fields":[{"name":"prowlarrUrl","value":"http://prowlarr:9696"},
@@ -126,19 +107,21 @@ account, or assrt with a token).
 
 ## 6. Jellyseerr + Plex/Jellyfin libraries + 中文化
 
-**Jellyseerr** (`:5055`) is a setup-wizard UI: sign in with Plex, add the Jellyfin
-server, and connect Sonarr/Radarr (host `sonarr`/`radarr` + API key) so requests
-auto-fulfil. This is interactive (Plex OAuth) — not scriptable.
+**Jellyseerr** (`:5055`) is a setup-wizard UI: choose Plex or Jellyfin, authenticate
+with that server, and connect Sonarr/Radarr (host `sonarr`/`radarr` + API key) so requests
+auto-fulfil. Use the UI for provider authentication. See [deployment.md](deployment.md) for
+cross-project network reachability before entering the server URL.
 
-**Plex libraries (中文 metadata)** — Plex trusts localhost without a token, so from
-the host you can create libraries pointing at the curated dirs, with zh-CN:
+**Plex libraries (中文 metadata)** — use an authenticated Plex token to create
+libraries pointing at the curated directories. The following assumes the default
+localhost binding; use the configured private address otherwise:
 
 ```bash
-PT=<plex_token>   # from plex_update.sh, or localhost may not need it
-curl -s -X POST "http://localhost:32400/library/sections?name=Movies&type=movie\
+PT='REPLACE_WITH_PLEX_TOKEN'
+curl --fail-with-body -sS -X POST "http://localhost:32400/library/sections?name=Movies&type=movie\
 &agent=tv.plex.agents.movie&scanner=Plex%20Movie&language=zh-CN\
 &location=%2Fmnt%2Fdata%2Fmedia%2Flibrary%2Fmovies&X-Plex-Token=$PT"
-curl -s -X POST "http://localhost:32400/library/sections?name=TV&type=show\
+curl --fail-with-body -sS -X POST "http://localhost:32400/library/sections?name=TV&type=show\
 &agent=tv.plex.agents.series&scanner=Plex%20TV%20Series&language=zh-CN\
 &location=%2Fmnt%2Fdata%2Fmedia%2Flibrary%2Ftv&X-Plex-Token=$PT"
 ```
@@ -153,7 +136,7 @@ to Chinese.
 ## Verify the whole pipeline
 
 Add one movie to Radarr (monitored, search). Expect: Radarr → Decypharr →
-Real-Debrid caches it → it appears under `/mnt/zurg` → Decypharr symlinks it into
+Real-Debrid caches it → it appears under `/mnt/zurg` → Decypharr creates a staging symlink → Radarr imports it into
 `/mnt/data/media/library/movies` → Plex/Jellyfin "Movies" library shows it (with
 a Chinese poster). If the file appears in `/mnt/zurg` but not in the library, or
 the library entry is a broken symlink, see `troubleshooting.md` (path consistency).
