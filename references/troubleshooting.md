@@ -5,8 +5,8 @@ hours if you don't know them.
 
 ## Storage layout — prefer a single disk
 
-The media never lands on disk (it streams from RD), so you don't need a big data
-volume. A **separate block volume is a liability**: on cloud hosts an iSCSI data
+Media streams from RD, but VFS caches, metadata, transcodes and backup staging
+need local capacity (see `deployment.md`). A **separate block volume is a liability**: on cloud hosts an iSCSI data
 volume mounted via `/etc/fstab` with `_netdev` (and no `nofail`) can silently
 **fail to mount after a reboot**. When that happens, anything configured to write
 under the mountpoint (e.g. docker's `data-root` at `/mnt/data/docker`) quietly

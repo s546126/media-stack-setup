@@ -83,7 +83,7 @@ services:
     hostname: misaka
     environment:
       - TS_HOSTNAME=misaka
-      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_AUTHKEY=${TS_AUTHKEY:-}           # reusable key, from .env (see tailscale-sidecars.md)
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
       - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:7768
@@ -93,7 +93,6 @@ services:
     volumes:
       - tailscale-misaka:/var/lib/tailscale
       - ./misaka-ts:/config
-    cap_add: [ NET_ADMIN, NET_RAW ]
 
   misaka:
     image: l429609201/misaka_danmu_server:latest   # mirror: ghcr.io/l429609201/misaka_danmu_server
@@ -150,7 +149,7 @@ services:
     hostname: libretv
     environment:
       - TS_HOSTNAME=libretv
-      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
       - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8080
@@ -160,7 +159,6 @@ services:
     volumes:
       - tailscale-libretv:/var/lib/tailscale
       - ./libretv-ts:/config
-    cap_add: [ NET_ADMIN, NET_RAW ]
 
   libretv:
     image: libretv-danmaku:latest           # built locally from libretv/, or instead:
