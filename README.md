@@ -19,11 +19,12 @@ internet); configs back up daily to Google Drive.
 
 （可选）弹幕：Sonarr/Radarr 导入完成 webhook → danmu-bridge → Misaka 按 TMDB/TVDB+季集抓弹幕
   → <视频名>.xml 写到符号链接旁 ；播放端经 Tailscale 调 Misaka 的弹弹play 接口
+（可选）LibreTV 网页播放器：搜采集站在线看，服务端按剧名+集数向 Misaka 取弹幕
 ```
 
 - **media stack** — zurg (RD client) → rclone FUSE mount `/mnt/zurg`; optional alist for 百度/夸克/阿里云盘; Plex and/or Jellyfin.
 - **arr stack** — Prowlarr, Sonarr, Radarr, Bazarr, Jellyseerr, and **Decypharr** (a qBittorrent-shim that bridges *arr to Real-Debrid and symlinks the cached files into the library).
-- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + `danmu-bridge` (a small Go service in this repo: Sonarr/Radarr webhooks → Misaka, backfill, writes `<video>.xml` beside each symlink); Jellyfin web (dd-danmaku) and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale.
+- **danmaku (optional)** — [Misaka danmu server](https://github.com/l429609201/misaka_danmu_server) + Postgres + `danmu-bridge` (a small Go service in this repo: Sonarr/Radarr webhooks → Misaka, backfill, writes `<video>.xml` beside each symlink); Jellyfin web (dd-danmaku) and dandanplay-compatible players (SenPlayer, Hills, …) pull 弹幕 over Tailscale. Optionally **LibreTV** (web player for third-party sources, built from upstream + this repo's patch) shows Misaka's 弹幕 too, matched by title + episode.
 - **access** — a Tailscale sidecar per service → `https://<svc>.<tailnet>.ts.net`.
 - **safety net** — daily cron backup of all configs → Google Drive.
 
@@ -34,12 +35,13 @@ internet); configs back up daily to Google Drive.
 | [`SKILL.md`](SKILL.md) | The skill entry point — prerequisites, 6-phase roadmap, operating principles |
 | [`references/compose-media.yml`](references/compose-media.yml) | Media-stack docker-compose template + setup notes |
 | [`references/compose-arr.yml`](references/compose-arr.yml) | arr automation docker-compose template |
-| [`references/compose-danmaku.yml`](references/compose-danmaku.yml) | Optional 弹幕 layer: Misaka + Postgres + tailscale sidecar + danmu-bridge |
+| [`references/compose-danmaku.yml`](references/compose-danmaku.yml) | Optional 弹幕 layer: Misaka + Postgres + tailscale sidecar + danmu-bridge (+ LibreTV, profile `libretv`) |
 | [`references/wiring.md`](references/wiring.md) | API wiring: Decypharr RD bridge, root folders, download clients, 中文化, 弹幕 (§7) |
 | [`references/tailscale-sidecars.md`](references/tailscale-sidecars.md) | Private access via userspace sidecar + `serve` (keeps the arr mesh working) |
 | [`references/troubleshooting.md`](references/troubleshooting.md) | Real-world gotchas (symlink path consistency, SELinux 203/EXEC, storage layout, 弹幕, …) |
 | [`scripts/config-backup.sh`](scripts/config-backup.sh) | Daily config backup → Google Drive |
 | [`danmu-bridge/`](danmu-bridge/) | Go source + Dockerfile for the Sonarr/Radarr → Misaka bridge (弹幕 layer) |
+| [`libretv/`](libretv/) | Dockerfile + danmaku patch for LibreTV pinned to an upstream commit (optional, 弹幕 layer) |
 | [`media-arch.svg`](media-arch.svg) | The architecture diagram above |
 
 ## Use it as a Claude Code skill

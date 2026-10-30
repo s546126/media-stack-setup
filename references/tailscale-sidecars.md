@@ -53,9 +53,9 @@ nodes — test before assuming a key is reusable.
 }
 ```
 Replace `8989` with the service's port (prowlarr 9696, radarr 7878, bazarr 6767,
-jellyseerr 5055, decypharr 8282, misaka 7768). Put each in `./<svc>-ts/serve.json`.
-(`compose-danmaku.yml` already ships Misaka this way; its serve.json proxies to
-`http://127.0.0.1:7768`.)
+jellyseerr 5055, decypharr 8282, misaka 7768, libretv 8080). Put each in `./<svc>-ts/serve.json`.
+(`compose-danmaku.yml` already ships Misaka this way, and the optional LibreTV
+with `http://127.0.0.1:8080`; Misaka's serve.json proxies to `http://127.0.0.1:7768`.)
 
 ## Compose pattern (per service, e.g. sonarr)
 

@@ -1,0 +1,486 @@
+From 953407a78e198b69fdb3fc8dc281eaedfb6e5de6 Mon Sep 17 00:00:00 2001
+From: Shengtao <shengtao546@gmail.com>
+Date: Fri, 30 Oct 2026 06:43:21 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20=E6=92=AD=E6=94=BE=E9=A1=B5=E6=8E=A5?=
+ =?UTF-8?q?=E5=85=A5=E8=87=AA=E5=BB=BA=E5=BC=B9=E5=BC=B9play=20=E5=85=BC?=
+ =?UTF-8?q?=E5=AE=B9=E5=BC=B9=E5=B9=95=EF=BC=88Misaka=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+服务端 /api/danmaku 按剧名 + 集号调用 Misaka 的 /match 与 /search/episodes，
+取 /comment 转成 artplayer-plugin-danmuku 格式；未设置 MISAKA_URL/MISAKA_TOKEN 时不挂插件。
+---
+ README.md                       |  1 +
+ docker-compose.yml              |  3 ++
+ package-lock.json               |  7 +++
+ package.json                    |  1 +
+ src/app/api/danmaku/route.ts    | 24 +++++++++
+ src/app/watch/page.tsx          |  7 +++
+ src/components/player-shell.tsx | 59 ++++++++++++++++++++-
+ src/lib/danmaku.test.ts         | 34 +++++++++++++
+ src/lib/danmaku.ts              | 76 ++++++++++++++++++++++++++++
+ src/lib/misaka.ts               | 90 +++++++++++++++++++++++++++++++++
+ 10 files changed, 300 insertions(+), 2 deletions(-)
+ create mode 100644 src/app/api/danmaku/route.ts
+ create mode 100644 src/lib/danmaku.test.ts
+ create mode 100644 src/lib/danmaku.ts
+ create mode 100644 src/lib/misaka.ts
+
+diff --git a/README.md b/README.md
+index 5714901..5be5c3b 100644
+--- a/README.md
++++ b/README.md
+@@ -120,6 +120,7 @@ PASSWORD=your-password npm start   # 监听 8080
+ | `DEFAULT_SUBSCRIPTIONS` | 否 | 预置数据源订阅（LibreTV-SourceList JSON 链接，也接受 TVBOX 配置与接口目录地址），JSON 数组：`["https://.../sources.json", {"url":"https://.../list.json","name":"名称","refreshDays":10}]`。首次访问自动导入点播源与直播源，之后按 `refreshDays`（1-365，缺省 1 天）静默刷新；用户删除后不再自动加回。`refreshDays` 只是初始值，用户在源管理面板改过之后以面板设置为准 |
+ | `DEFAULT_RECOMMEND_SOURCE` | 否 | 首页推荐数据源的默认值（`douban` / `bangumi` / `hot-list`，出厂默认 `hot-list`）；仅对未在设置中主动选择过的用户生效，用户的选择始终优先 |
+ | `LIVE_ALLOW_PRIVATE` | 否 | 设为 `1` 时允许直播流代理访问内网/保留地址（自建 IPTV 场景），默认关闭以维持 SSRF 防护 |
++| `MISAKA_URL` / `MISAKA_TOKEN` | 否 | 自建弹弹play 兼容弹幕服务（如 Misaka danmu server）的地址和 token；都设置后播放页按剧名 + 集号匹配并显示弹幕。token 只在服务端使用 |
+ 
+ ## 使用说明
+ 
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 831986b..5066d57 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -29,6 +29,9 @@ services:
+       # - DEFAULT_RECOMMEND_SOURCE=douban
+       # 可选：自建内网 IPTV 放行（对拉列表、测活、拉流三个阶段同时生效，默认关闭以维持 SSRF 防护）
+       # - LIVE_ALLOW_PRIVATE=1
++      # 弹幕：自建弹弹play 兼容服务（如 Misaka danmu server），两项都设才启用
++      # - MISAKA_URL=https://misaka.example.ts.net
++      # - MISAKA_TOKEN=your-misaka-token
+       # 可选：代理上游请求超时（毫秒）与重试次数
+       # - REQUEST_TIMEOUT=8000
+       # - MAX_RETRIES=1
+diff --git a/package-lock.json b/package-lock.json
+index ac30573..76331c8 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -12,6 +12,7 @@
+         "@tanstack/react-query": "^5.59.0",
+         "@tanstack/react-virtual": "^3.14.12",
+         "artplayer": "^5.2.3",
++        "artplayer-plugin-danmuku": "^5.3.0",
+         "dexie": "^4.0.8",
+         "dexie-react-hooks": "^1.1.7",
+         "hls.js": "^1.5.17",
+@@ -2935,6 +2936,12 @@
+         "option-validator": "^2.0.6"
+       }
+     },
++    "node_modules/artplayer-plugin-danmuku": {
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/artplayer-plugin-danmuku/-/artplayer-plugin-danmuku-5.3.0.tgz",
++      "integrity": "sha512-a76bU1cWEZr53hD1X8IHfOzS4QawGHn8dQ3fIYyJ5TsyhTSnznhi2WzkS8M7LL3H02ekXRZTUFan9+9EERk12g==",
++      "license": "MIT"
++    },
+     "node_modules/assertion-error": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/assertion-error/-/assertion-error-2.0.1.tgz",
+diff --git a/package.json b/package.json
+index 571016a..b462474 100644
+--- a/package.json
++++ b/package.json
+@@ -16,6 +16,7 @@
+     "@tanstack/react-query": "^5.59.0",
+     "@tanstack/react-virtual": "^3.14.12",
+     "artplayer": "^5.2.3",
++    "artplayer-plugin-danmuku": "^5.3.0",
+     "dexie": "^4.0.8",
+     "dexie-react-hooks": "^1.1.7",
+     "hls.js": "^1.5.17",
+diff --git a/src/app/api/danmaku/route.ts b/src/app/api/danmaku/route.ts
+new file mode 100644
+index 0000000..67eb2e6
+--- /dev/null
++++ b/src/app/api/danmaku/route.ts
+@@ -0,0 +1,24 @@
++import { NextResponse } from 'next/server';
++import { guardRequest, jsonError } from '@/lib/api-guard';
++import { fetchDanmaku } from '@/lib/misaka';
++
++export const runtime = 'nodejs';
++
++/** 弹幕：按剧名 + 集号到自建弹弹play 兼容服务（MISAKA_URL）匹配并取弹幕 */
++export async function GET(req: Request) {
++  const guarded = guardRequest(req);
++  if (guarded) return guarded;
++
++  const params = new URL(req.url).searchParams;
++  const title = (params.get('title') || '').trim().slice(0, 200);
++  const episode = parseInt(params.get('episode') || '1', 10);
++  const total = parseInt(params.get('total') || '1', 10);
++  const year = (params.get('year') || '').trim().slice(0, 8) || undefined;
++  if (!title || !(episode >= 1) || !(total >= 1)) return jsonError('参数无效', 400);
++
++  try {
++    return NextResponse.json(await fetchDanmaku({ title, episode, total, year }));
++  } catch (err) {
++    return jsonError(err instanceof Error ? err.message : '弹幕获取失败', 502);
++  }
++}
+diff --git a/src/app/watch/page.tsx b/src/app/watch/page.tsx
+index 105ea88..f5fed5a 100644
+--- a/src/app/watch/page.tsx
++++ b/src/app/watch/page.tsx
+@@ -328,6 +328,13 @@ function WatchContent() {
+                   onPlayerApi={(api) => { playerApiRef.current = api; }}
+                   onRecordSegment={handleRecordSegment}
+                   episodeKey={`${sourceKey}:${vodId}:${currentIndex}`}
++                  // 直连链接没有剧名，无从匹配弹幕
++                  danmaku={titleParam || detailQuery.data?.videoInfo?.title ? {
++                    title: videoTitle,
++                    episode: currentIndex + 1,
++                    total: Math.max(episodes.length, 1),
++                    year: detailQuery.data?.videoInfo?.year,
++                  } : undefined}
+                   nextUrl={currentIndex + 1 < episodes.length ? episodes[currentIndex + 1] : undefined}
+                   nextEpisodeKey={currentIndex + 1 < episodes.length ? `${sourceKey}:${vodId}:${currentIndex + 1}` : undefined}
+                   getRestorePosition={getRestorePosition}
+diff --git a/src/components/player-shell.tsx b/src/components/player-shell.tsx
+index 5bf6b33..a3c9da2 100644
+--- a/src/components/player-shell.tsx
++++ b/src/components/player-shell.tsx
+@@ -3,6 +3,7 @@
+ import { useEffect, useRef, useState } from 'react';
+ import Artplayer from 'artplayer';
+ import Hls, { type HlsConfig } from 'hls.js';
++import artplayerPluginDanmuku from 'artplayer-plugin-danmuku';
+ 
+ import { PlaybackRecovery, describeHlsError } from '@/lib/playback-recovery';
+ import { createHlsLoader } from '@/lib/hls-loader';
+@@ -28,6 +29,7 @@ import {
+   DESKTOP_CONTROL_HIDE_MS,
+   TOUCH_CONTROL_HIDE_MS,
+ } from '@/lib/control-hide';
++import type { DanmakuQuery, DanmakuResponse } from '@/lib/danmaku';
+ 
+ /** 片段时间统一保留 1 位小数：与面板展示保持一致，避免浮点尾巴 */
+ const round1 = (v: number) => Math.round(v * 10) / 10;
+@@ -97,6 +99,8 @@ interface PlayerShellProps {
+   onNextEpisode?: () => void;
+   hasPrevEpisode?: boolean;
+   hasNextEpisode?: boolean;
++  /** 当前集的弹幕查询（剧名 + 集号）；服务端未配置 MISAKA_URL 时不显示弹幕 */
++  danmaku?: DanmakuQuery;
+ }
+ 
+ export function PlayerShell({
+@@ -123,6 +127,7 @@ export function PlayerShell({
+   onNextEpisode,
+   hasPrevEpisode,
+   hasNextEpisode,
++  danmaku,
+ }: PlayerShellProps) {
+   const containerRef = useRef<HTMLDivElement>(null);
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+@@ -140,14 +145,14 @@ export function PlayerShell({
+     pendingStart, onPendingStart, onPlayerApi, onRecordSegment,
+     episodeKey, nextUrl, nextEpisodeKey,
+     getRestorePosition, onTimeUpdate, onEnded, onPause, onQuality, onRequestSwitchSource,
+-    onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode,
++    onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode, danmaku,
+   });
+   propsRef.current = {
+     url, title, adFilter, autoplayNext, skipMark, autoSkipSegments,
+     pendingStart, onPendingStart, onPlayerApi, onRecordSegment,
+     episodeKey, nextUrl, nextEpisodeKey,
+     getRestorePosition, onTimeUpdate, onEnded, onPause, onQuality, onRequestSwitchSource,
+-    onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode,
++    onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode, danmaku,
+   };
+ 
+   /** 上报实测画质：多次上报取大值由调用方决定，这里只管把拿到的高度传出去 */
+@@ -462,6 +467,54 @@ export function PlayerShell({
+     });
+   };
+ 
++  // 弹幕请求序号：换集快于 Misaka 匹配时，丢弃上一集迟到的结果
++  const danmakuSeqRef = useRef(0);
++
++  /** 拉取当前集弹幕；首次拿到 enabled 才挂插件，未配置 Misaka 的部署完全无感 */
++  const loadDanmaku = async () => {
++    const seq = ++danmakuSeqRef.current;
++    const art = artRef.current;
++    const q = propsRef.current.danmaku;
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const plugin = art?.plugins?.artplayerPluginDanmuku as any;
++    // 先清掉上一集的弹幕，匹配期间不串集
++    if (plugin) await plugin.load([]);
++    if (!art || !q?.title) return;
++    let data: DanmakuResponse;
++    try {
++      const params = new URLSearchParams({
++        title: q.title,
++        episode: String(q.episode),
++        total: String(q.total),
++      });
++      if (q.year) params.set('year', q.year);
++      const res = await fetch(`/api/danmaku?${params}`);
++      if (!res.ok) return;
++      data = (await res.json()) as DanmakuResponse;
++    } catch {
++      return;
++    }
++    if (seq !== danmakuSeqRef.current || artRef.current !== art || !data.enabled) return;
++    if (!art.plugins.artplayerPluginDanmuku) {
++      art.plugins.add(
++        artplayerPluginDanmuku({
++          danmuku: data.comments,
++          speed: 7,
++          opacity: 0.9,
++          fontSize: 24,
++          antiOverlap: true,
++          synchronousPlayback: true,
++          emitter: false,
++        })
++      );
++    } else {
++      await art.plugins.artplayerPluginDanmuku.load(data.comments);
++    }
++    if (data.matched && data.comments.length > 0) {
++      showHint(`弹幕 ${data.comments.length} 条 · ${data.matched.animeTitle} ${data.matched.episodeTitle}`);
++    }
++  };
++
+   /** 换集：重置每集状态并切换到新 HLS 源（不重建 ArtPlayer）。 */
+   const loadEpisode = (targetUrl: string) => {
+     if (!targetUrl) return;
+@@ -485,6 +538,7 @@ export function PlayerShell({
+     const art = artRef.current;
+     if (!art) return;
+     setupHls(art.video, targetUrl, true);
++    void loadDanmaku();
+   };
+ 
+   // —— 创建播放器（仅一次，挂载即创建） ——
+@@ -563,6 +617,7 @@ export function PlayerShell({
+       },
+     });
+     artRef.current = art;
++    void loadDanmaku();
+ 
+     // 进度条区间可视化：初始渲染一次，换集 duration 变化时重绘
+     renderSkipMarks();
+diff --git a/src/lib/danmaku.test.ts b/src/lib/danmaku.test.ts
+new file mode 100644
+index 0000000..3f058e9
+--- /dev/null
++++ b/src/lib/danmaku.test.ts
+@@ -0,0 +1,34 @@
++import { describe, expect, it } from 'vitest';
++import { buildMatchFileName, cleanTitle, convertDandanComments } from './danmaku';
++
++describe('convertDandanComments', () => {
++  it('maps dandanplay p fields to artplayer danmaku', () => {
++    expect(
++      convertDandanComments([
++        { cid: 1, p: '12.5,1,16777215,[bilibili]', m: '前方高能' },
++        { cid: 2, p: '3,5,16711680', m: '顶部' },
++        { cid: 3, p: '7,4,255', m: '底部' },
++      ])
++    ).toEqual([
++      { text: '顶部', time: 3, mode: 1, color: '#ff0000' },
++      { text: '底部', time: 7, mode: 2, color: '#0000ff' },
++      { text: '前方高能', time: 12.5, mode: 0, color: '#ffffff' },
++    ]);
++  });
++
++  it('drops malformed entries', () => {
++    expect(convertDandanComments([{ p: 'x,1,0', m: 'a' }, { p: '1,1,0', m: '' }])).toEqual([]);
++  });
++});
++
++describe('buildMatchFileName', () => {
++  it('uses 第N集 for series and title (+year) for movies', () => {
++    expect(buildMatchFileName({ title: '繁花', episode: 5, total: 30 })).toBe('繁花 第5集');
++    expect(buildMatchFileName({ title: '流浪地球2', episode: 1, total: 1, year: '2023' })).toBe('流浪地球2 (2023)');
++  });
++
++  it('strips source decorations but keeps season words', () => {
++    expect(cleanTitle('庆余年第二季[HD]国语版')).toBe('庆余年第二季');
++    expect(cleanTitle('葬送的芙莉莲（2023）')).toBe('葬送的芙莉莲');
++  });
++});
+diff --git a/src/lib/danmaku.ts b/src/lib/danmaku.ts
+new file mode 100644
+index 0000000..fe75f14
+--- /dev/null
++++ b/src/lib/danmaku.ts
+@@ -0,0 +1,76 @@
++/**
++ * 弹幕（弹弹play 兼容接口，如自建 Misaka）的纯函数部分：前后端共用，便于单测。
++ * 网络请求在 misaka.ts（服务端），播放器侧只消费 DanmakuItem[]。
++ */
++
++/** artplayer-plugin-danmuku 的弹幕项（mode: 0 滚动 / 1 顶部 / 2 底部） */
++export interface DanmakuItem {
++  text: string;
++  time: number;
++  mode: 0 | 1 | 2;
++  color: string;
++}
++
++/** 播放页传给播放器的「这一集是什么」：采集站不给外部 ID，只能靠剧名 + 集号匹配 */
++export interface DanmakuQuery {
++  title: string;
++  /** 第几集，从 1 开始 */
++  episode: number;
++  /** 分集总数：1 视为电影 */
++  total: number;
++  year?: string;
++}
++
++/** /api/danmaku 的响应 */
++export interface DanmakuResponse {
++  /** 服务端未配置 MISAKA_URL 时为 false，播放器据此不挂弹幕插件 */
++  enabled: boolean;
++  matched?: { animeTitle: string; episodeTitle: string; episodeId: number };
++  comments: DanmakuItem[];
++}
++
++/** 弹弹play 的 comment.p：`time,mode,color[,source]`，mode 1 滚动 / 4 底部 / 5 顶部 */
++export interface DandanComment {
++  cid?: number;
++  p: string;
++  m: string;
++}
++
++export function convertDandanComments(comments: DandanComment[]): DanmakuItem[] {
++  const out: DanmakuItem[] = [];
++  for (const c of comments) {
++    if (!c || typeof c.p !== 'string' || !c.m) continue;
++    const [t, mode, color] = c.p.split(',');
++    const time = Number(t);
++    if (!Number.isFinite(time) || time < 0) continue;
++    const colorNum = Number(color);
++    out.push({
++      text: c.m,
++      time,
++      mode: mode === '4' ? 2 : mode === '5' ? 1 : 0,
++      color: Number.isFinite(colorNum)
++        ? `#${(colorNum & 0xffffff).toString(16).padStart(6, '0')}`
++        : '#ffffff',
++    });
++  }
++  return out.sort((a, b) => a.time - b.time);
++}
++
++/**
++ * 采集站剧名常带「国语版」「[HD]」「(2024)」之类的尾巴，匹配前去掉。
++ * 「第二季」保留：Misaka 的文件名解析会把它识别成季号。
++ */
++export function cleanTitle(title: string): string {
++  return title
++    .replace(/[[【(（][^\]】)）]*[\]】)）]/g, ' ')
++    .replace(/(国语|粤语|日语|英语|中字|普通话|高清|蓝光|未删减|完整)版?/g, ' ')
++    .replace(/\s+/g, ' ')
++    .trim();
++}
++
++/** 给 /match 用的「文件名」：电影只给剧名（+年份），剧集给「剧名 第N集」 */
++export function buildMatchFileName(q: DanmakuQuery): string {
++  const title = cleanTitle(q.title);
++  if (q.total <= 1) return q.year ? `${title} (${q.year})` : title;
++  return `${title} 第${q.episode}集`;
++}
+diff --git a/src/lib/misaka.ts b/src/lib/misaka.ts
+new file mode 100644
+index 0000000..493c13f
+--- /dev/null
++++ b/src/lib/misaka.ts
+@@ -0,0 +1,90 @@
++import {
++  buildMatchFileName,
++  cleanTitle,
++  convertDandanComments,
++  type DandanComment,
++  type DanmakuQuery,
++  type DanmakuResponse,
++} from './danmaku';
++
++/**
++ * 服务端对接弹弹play 兼容弹幕服务（Misaka danmu server）。
++ * MISAKA_URL 例：https://misaka.tailnet.ts.net（服务端直连，不经浏览器，没有混合内容/CORS 问题）
++ * MISAKA_TOKEN：Misaka「弹幕 → Token管理」里建的 token，只留在服务端，不下发浏览器。
++ */
++export function getMisakaBase(): string | null {
++  const url = process.env.MISAKA_URL?.trim().replace(/\/+$/, '');
++  const token = process.env.MISAKA_TOKEN?.trim();
++  if (!url || !token) return null;
++  return `${url}/api/v1/${encodeURIComponent(token)}/api/v2`;
++}
++
++// 后备匹配会在 Misaka 侧全网搜索并导入，首次可能要几十秒（matchFallbackTimeout 默认 60s）
++const MATCH_TIMEOUT_MS = 70_000;
++const COMMENT_TIMEOUT_MS = 30_000;
++// 同一集的匹配结果缓存，避免换源/刷新反复触发 Misaka 后备搜索
++const MATCH_CACHE_TTL_MS = 6 * 60 * 60_000;
++const matchCache = new Map<string, { at: number; value: DanmakuResponse['matched'] | null }>();
++
++async function getJson<T>(url: string, init: RequestInit, timeoutMs: number): Promise<T> {
++  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs), cache: 'no-store' });
++  if (!res.ok) throw new Error(`Misaka HTTP ${res.status}`);
++  return (await res.json()) as T;
++}
++
++interface MatchResp {
++  isMatched?: boolean;
++  matches?: { episodeId: number; animeTitle: string; episodeTitle: string }[];
++}
++interface SearchEpisodesResp {
++  animes?: { animeTitle: string; episodes?: { episodeId: number; episodeTitle: string }[] }[];
++}
++
++async function resolveEpisode(base: string, q: DanmakuQuery): Promise<DanmakuResponse['matched'] | null> {
++  // 1) /match：库内匹配，未命中时由 Misaka 后备匹配（需在其设置中开启）全网搜索 + 导入
++  const match = await getJson<MatchResp>(
++    `${base}/match`,
++    {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ fileName: buildMatchFileName(q), matchMode: 'fileNameOnly' }),
++    },
++    MATCH_TIMEOUT_MS
++  );
++  const m = match.isMatched ? match.matches?.[0] : undefined;
++  if (m) return { episodeId: m.episodeId, animeTitle: m.animeTitle, episodeTitle: m.episodeTitle };
++
++  // 2) /search/episodes：按剧名 + 集号查库，兜住文件名解析没认出来的情况
++  const params = new URLSearchParams({ anime: cleanTitle(q.title) });
++  if (q.total > 1) params.set('episode', String(q.episode));
++  const search = await getJson<SearchEpisodesResp>(`${base}/search/episodes?${params}`, {}, COMMENT_TIMEOUT_MS);
++  for (const anime of search.animes ?? []) {
++    const ep = anime.episodes?.[0];
++    if (ep) return { episodeId: ep.episodeId, animeTitle: anime.animeTitle, episodeTitle: ep.episodeTitle };
++  }
++  return null;
++}
++
++export async function fetchDanmaku(q: DanmakuQuery): Promise<DanmakuResponse> {
++  const base = getMisakaBase();
++  if (!base) return { enabled: false, comments: [] };
++
++  const key = `${cleanTitle(q.title)}|${q.year ?? ''}|${q.total}|${q.episode}`;
++  const hit = matchCache.get(key);
++  let matched: DanmakuResponse['matched'] | null;
++  if (hit && Date.now() - hit.at < MATCH_CACHE_TTL_MS) {
++    matched = hit.value;
++  } else {
++    matched = await resolveEpisode(base, q);
++    // 没匹配上也缓存，但只缓存 10 分钟：Misaka 后台导入可能稍后完成
++    matchCache.set(key, { at: matched ? Date.now() : Date.now() - MATCH_CACHE_TTL_MS + 10 * 60_000, value: matched });
++  }
++  if (!matched) return { enabled: true, comments: [] };
++
++  const data = await getJson<{ comments?: DandanComment[] }>(
++    `${base}/comment/${matched.episodeId}?withRelated=true&chConvert=1`,
++    {},
++    COMMENT_TIMEOUT_MS
++  );
++  return { enabled: true, matched, comments: convertDandanComments(data.comments ?? []) };
++}
+-- 
+2.43.0
+
