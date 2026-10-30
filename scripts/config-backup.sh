@@ -3,8 +3,10 @@
 # Daily config backup -> Google Drive (via rclone), 14-day retention.
 #
 # Backs up the IRREPLACEABLE config (compose files, zurg config + rclone.conf,
-# each *arr app's config dir incl. its sqlite DB, alist data). It does NOT back
-# up media (that lives in Real-Debrid / the cloud) or regenerable caches.
+# each *arr app's config dir incl. its sqlite DB, alist data, and — if the
+# danmaku layer is deployed — Misaka's config + a pg_dump of its database).
+# It does NOT back up media (that lives in Real-Debrid / the cloud) or
+# regenerable caches.
 #
 # Setup:
 #   1) Have an rclone remote for Google Drive (e.g. `gdrive`):  rclone config
@@ -25,11 +27,22 @@ LOG=/home/opc/config-backup.log
 
 {
   echo "[$(date)] START config backup"
+  # Misaka (danmaku layer, optional): dump its Postgres to a file so the tar gets
+  # a consistent copy (tarring a live DB dir isn't). Skipped if not deployed.
+  MISAKA_DUMP="$MEDIA_DIR/misaka-db.sql"
+  if sudo docker ps --format '{{.Names}}' | grep -qx misaka-db; then
+    sudo docker exec misaka-db pg_dump -U danmuapi -d danmuapi --clean --if-exists \
+      > "$MISAKA_DUMP.tmp" && mv "$MISAKA_DUMP.tmp" "$MISAKA_DUMP" \
+      || echo "[$(date)] WARN misaka pg_dump failed"
+  fi
   # tar the configs (relative to /), exclude regenerable cache/log dirs, stream
   # straight to the cloud (rcat) so nothing large lands on local disk.
+  # (--ignore-failed-read: the danmaku entries are optional and may not exist)
   sudo tar -czf - -C / \
     --exclude='*/cache/*' --exclude='*/Cache/*' --exclude='*/logs/*' \
     --exclude='*/log/*' --exclude='*.log' \
+    --exclude='*/misaka-config/danmaku' \
+    --ignore-failed-read \
     "${MEDIA_DIR#/}/docker-compose.yml" \
     "${MEDIA_DIR#/}/docker-compose.arr.yml" \
     "${MEDIA_DIR#/}/zurg/config.yml" \
@@ -42,6 +55,9 @@ LOG=/home/opc/config-backup.log
     "${MEDIA_DIR#/}/jellyseerr-config" \
     "${MEDIA_DIR#/}/decypharr-config" \
     "${MEDIA_DIR#/}/alist" \
+    "${MEDIA_DIR#/}/docker-compose.danmaku.yml" \
+    "${MEDIA_DIR#/}/misaka-config" \
+    "${MEDIA_DIR#/}/misaka-db.sql" \
     2>/dev/null | rclone rcat "$REMOTE"
   echo "[$(date)] uploaded: $(rclone size "$REMOTE" 2>/dev/null | tr '\n' ' ')"
   # retention: drop backups older than RETENTION_DAYS
@@ -51,3 +67,7 @@ LOG=/home/opc/config-backup.log
 
 # Restore (manual): rclone cat gdrive:media-backups/configs/media-configs-YYYY-MM-DD.tar.gz \
 #                   | sudo tar -xzf - -C /
+# Misaka DB (after `up -d misaka-db`):
+#   docker exec -i misaka-db psql -U danmuapi -d danmuapi < /mnt/data/media/misaka-db.sql
+# Misaka's XML store (misaka-config/danmaku) is excluded above: it can be large
+# and is re-fetched by resubmitting (bridge backfill). Drop that --exclude to keep it.

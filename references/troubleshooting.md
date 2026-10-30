@@ -89,6 +89,37 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
 - `default_download_action` should be `symlink` (not copy — copying defeats the
   no-local-storage design).
 
+## 弹幕 (danmaku) layer
+
+- **Webhook test fails / nothing happens on import**: Sonarr/Radarr and
+  `danmu-bridge` must share `arr_default` (`docker network inspect arr_default`
+  lists both). The danmaku project declares that network `external`, so bring
+  the arr stack up first. Check `docker logs danmu-bridge` for a 401 (secret
+  mismatch) vs. no request at all (network/URL).
+- **Bridge submits but Misaka imports nothing**: Misaka's task list shows the
+  reason. Usual causes: no TMDB key in 元信息搜索源 (id search can't resolve a
+  title); all danmaku sources disabled; or the sources are geo-blocked from a
+  non-China host — configure `设置 → 代理配置`. "Duplicate task" refusals within
+  3h are Misaka's `externalApiDuplicateTaskThresholdHours`, not an error.
+- **Wrong episodes' danmaku (anime)**: TVDB vs. site numbering. Fix with a
+  本地剧集组 or a 识别词 offset in Misaka, then resubmit — see wiring.md §7d.
+- **xml lands in the wrong place / not next to the video**: the sync writes
+  beside the **symlink** under `/mnt/data/media/library`, never under
+  `/mnt/zurg` (read-only FUSE; writes there fail or vanish). The bridge must
+  see `/mnt` at `/mnt` (same path rule as everything else here).
+- **xml files flip-flop or duplicate**: two writers. Remove any Jellyfin
+  danmaku plugin that downloads its own xml, and keep Misaka's own media-server
+  sync off — the bridge is the only writer.
+- **Jellyfin web shows no danmaku but SenPlayer does**: the dd-danmaku script
+  is calling `http://...` from the https Jellyfin page (mixed content, blocked
+  silently) or an IP the browser can't reach. Use
+  `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`. If the browser console shows
+  a CORS error, that's between the script and Misaka — check both projects'
+  current notes; this repo hasn't verified CORS behavior.
+- **Misaka won't start**: it needs MySQL or Postgres (no SQLite). With
+  `postgres:18` the volume is `/var/lib/postgresql` (not `.../data`); a wrong
+  path or a dir not owned by 1000:1000 shows up in `docker logs misaka-db`.
+
 ## Security hygiene
 
 - Never expose service ports on `0.0.0.0` on a public-IP host. Bind to the

@@ -1,0 +1,134 @@
+# ============================================================================
+# DANMAKU (弹幕) LAYER — Misaka danmu server + Postgres + Sonarr/Radarr bridge
+# Place at /mnt/data/media/docker-compose.danmaku.yml
+# Bring up as its OWN compose project, AFTER the arr stack is running:
+#   cd /mnt/data/media
+#   mkdir -p misaka-config misaka-db misaka-ts && chown 1000:1000 misaka-db
+#   # misaka-ts/serve.json = the serve.json from tailscale-sidecars.md with
+#   # "Proxy": "http://127.0.0.1:7768"
+#   docker compose -p danmaku -f docker-compose.danmaku.yml config   # validate
+#   docker compose -p danmaku -f docker-compose.danmaku.yml up -d
+# ----------------------------------------------------------------------------
+# How it fits (Jellyfin/Plex only PLAY; they don't trigger anything here):
+#   new imports : Sonarr/Radarr "On Import" webhook → danmu-bridge → Misaka
+#                 (matched by TMDB/TVDB id + season/episode)
+#   existing    : danmu-bridge backfill pulls every item from the Sonarr/Radarr
+#                 APIs and submits them to Misaka
+#   files       : Misaka keeps the XML; danmu-bridge's sync writes
+#                 <video name>.xml next to each symlink under the library
+#                 (local disk — never into the /mnt/zurg FUSE mount)
+#   playback    : Jellyfin web (dd-danmaku script) and dandanplay-compatible
+#                 clients (SenPlayer, Hills, …) call Misaka's dandanplay API over
+#                 Tailscale: https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>
+# Wiring steps: references/wiring.md §7.
+#
+# KEY POINTS:
+#   - Joins the arr stack's network (`arr_default`, external here) so Sonarr/
+#     Radarr reach `danmu-bridge` by name and the bridge reaches `sonarr`,
+#     `radarr`, `misaka`. If you converted the arr apps to sidecars, their
+#     aliases keep working (see tailscale-sidecars.md).
+#   - Misaka supports MySQL or PostgreSQL only (no SQLite). Postgres is used
+#     here; MySQL works too (see Misaka's docs).
+#   - Misaka's UI and dandanplay API are both on :7768. It rides a userspace
+#     tailscale sidecar with `serve` (443 → 127.0.0.1:7768), same pattern as
+#     the other services; the `misaka` alias keeps http://misaka:7768 working
+#     for the bridge. https matters: the Jellyfin web page is https, so a
+#     browser script calling plain-http Misaka is blocked as mixed content.
+#   - Image/ports/paths below are from Misaka's own docs + source
+#     (github.com/l429609201/misaka_danmu_server); multi-arch, runs on ARM.
+#   - danmu-bridge is a small Go service maintained separately (not in this
+#     repo yet). Its image name, port and env var names below are the agreed
+#     interface — check them against the bridge's own README before deploying.
+# ============================================================================
+
+services:
+  misaka-db:
+    image: postgres:18
+    container_name: misaka-db
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - POSTGRES_USER=danmuapi
+      - POSTGRES_DB=danmuapi
+      - POSTGRES_PASSWORD=<YOUR_MISAKA_DB_PASSWORD>
+      - TZ=UTC
+    volumes:
+      - ./misaka-db:/var/lib/postgresql    # postgres 18+ layout (not .../data)
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U danmuapi -d danmuapi" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # no ports: only misaka talks to it, over the shared network
+
+  misaka-ts:
+    image: tailscale/tailscale:latest
+    container_name: misaka-ts
+    restart: unless-stopped
+    hostname: misaka
+    environment:
+      - TS_HOSTNAME=misaka
+      - TS_AUTHKEY=<REUSABLE_TS_AUTHKEY>
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:7768
+    networks:
+      default:
+        aliases: [ misaka ]      # ← keeps http://misaka:7768 working for the bridge
+    volumes:
+      - tailscale-misaka:/var/lib/tailscale
+      - ./misaka-ts:/config
+    cap_add: [ NET_ADMIN, NET_RAW ]
+
+  misaka:
+    image: l429609201/misaka_danmu_server:latest   # mirror: ghcr.io/l429609201/misaka_danmu_server
+    container_name: misaka
+    restart: unless-stopped
+    network_mode: "service:misaka-ts"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=0022
+      - TZ=UTC
+      - DANMUAPI_DATABASE__TYPE=postgresql
+      - DANMUAPI_DATABASE__HOST=misaka-db
+      - DANMUAPI_DATABASE__PORT=5432
+      - DANMUAPI_DATABASE__NAME=danmuapi
+      - DANMUAPI_DATABASE__USER=danmuapi
+      - DANMUAPI_DATABASE__PASSWORD=<YOUR_MISAKA_DB_PASSWORD>
+      - DANMUAPI_ADMIN__INITIAL_USER=admin   # first-boot password is printed in `docker logs misaka`
+    volumes:
+      - ./misaka-config:/app/config        # config.yml, logs, and the XML store (danmaku/{tv,movies})
+      # No docker.sock: skips Misaka's in-UI "update/restart" button, by design.
+    depends_on:
+      misaka-db: { condition: service_healthy }
+      misaka-ts: { condition: service_started }
+
+  danmu-bridge:
+    image: <YOUR_DANMU_BRIDGE_IMAGE>        # or build from the bridge's source dir:
+    # build: <PATH_TO_DANMU_BRIDGE_SOURCE>
+    container_name: danmu-bridge
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+      - MISAKA_URL=http://misaka:7768
+      - MISAKA_API_KEY=<YOUR_MISAKA_CONTROL_API_KEY>   # Misaka UI → 外部控制 → API 密钥
+      - SONARR_URL=http://sonarr:8989
+      - SONARR_API_KEY=<YOUR_SONARR_API_KEY>
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=<YOUR_RADARR_API_KEY>
+      - LIBRARY_ROOT=/mnt/data/media/library
+      - WEBHOOK_SECRET=<YOUR_WEBHOOK_SECRET>          # optional shared secret for the *arr webhooks
+    volumes:
+      - /mnt:/mnt:rslave                     # sees the library at its real path; writes <video>.xml beside symlinks
+      - ./misaka-config:/misaka-config:ro    # reads Misaka's XML store for the sync
+    # no ports: Sonarr/Radarr reach http://danmu-bridge:8090 over the network
+    depends_on: [ misaka ]
+
+networks:
+  default:
+    name: arr_default
+    external: true
+
+volumes:
+  tailscale-misaka:

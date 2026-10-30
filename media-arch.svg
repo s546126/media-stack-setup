@@ -4,6 +4,7 @@
     <marker id="arA" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#d97706"/></marker>
     <marker id="arR" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#e11d48"/></marker>
     <marker id="arB" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#7c3aed"/></marker>
+    <marker id="arO" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 z" fill="#ea580c"/></marker>
   </defs>
   <rect width="1480" height="700" fill="#ffffff"/>
 
@@ -24,6 +25,23 @@
   <rect x="991" y="150" width="215" height="44" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
   <text x="1098" y="170" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">alist :5244 + rclone-alist</text>
   <text x="1098" y="186" font-size="10.5" fill="#64748b" text-anchor="middle">→ /mnt/alist (FUSE)</text>
+
+  <!-- ===== OPTIONAL DANMAKU LAYER ===== -->
+  <rect x="40" y="118" width="520" height="100" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="54" y="136" font-size="12.5" font-weight="700" fill="#9a3412">弹幕层（可选）· danmaku 栈</text>
+  <rect x="56" y="146" width="90" height="40" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="1.3"/>
+  <text x="101" y="171" font-size="11" font-weight="600" fill="#9a3412" text-anchor="middle">Postgres</text>
+  <rect x="156" y="146" width="180" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="246" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">Misaka :7768 (+ts)</text>
+  <text x="246" y="179" font-size="10" fill="#c2410c" text-anchor="middle">抓弹幕 · 弹弹play 接口</text>
+  <rect x="376" y="146" width="170" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="461" y="164" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">danmu-bridge</text>
+  <text x="461" y="179" font-size="10" fill="#c2410c" text-anchor="middle">webhook · backfill · xml 同步</text>
+  <line x1="146" y1="166" x2="156" y2="166" stroke="#ea580c" stroke-width="1.4"/>
+  <line x1="376" y1="166" x2="338" y2="166" stroke="#ea580c" stroke-width="1.6" marker-end="url(#arO)"/>
+  <text x="56" y="206" font-size="10.5" fill="#c2410c">xml → 符号链接旁 · 播放端经 Tailscale 拉弹幕</text>
+  <line x1="461" y1="267" x2="461" y2="188" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arO)" stroke-dasharray="4 3"/>
+  <text x="468" y="232" font-size="10.5" fill="#c2410c">导入 webhook</text>
 
   <!-- ===== STAGE HEADERS ===== -->
   <text x="139"  y="246" font-size="13.5" font-weight="700" fill="#334155" text-anchor="middle">① 入口</text>
@@ -133,7 +151,7 @@
   <line x1="996" y1="528" x2="1010" y2="528" stroke="#475569" stroke-width="1.6" marker-end="url(#ar)"/>
 
   <text x="56" y="592" font-size="11" fill="#64748b">单机 = 单点；boot 200G；影片在 Real-Debrid / 云盘，不落本地盘；docker 容器 restart=unless-stopped 开机自启。</text>
-  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈 8 容器（zurg/rclone/alist/plex/jellyfin…）+ arr 栈 6 容器，跨栈走宿主机 /mnt 路径 + tailscale 黏合。</text>
+  <text x="56" y="614" font-size="11" fill="#64748b">媒体栈 8 容器（zurg/rclone/alist/plex/jellyfin…）+ arr 栈 6 容器（+ 可选弹幕栈 4 容器），跨栈走宿主机 /mnt 路径 + tailscale 黏合。</text>
   <text x="56" y="636" font-size="11" fill="#64748b">访问：每个服务都有独立 tailscale 节点，内网 https://&lt;服务名&gt;.&lt;你的tailnet&gt;.ts.net 直达，无公网暴露。</text>
 
   <!-- ===== HUNTER ===== -->

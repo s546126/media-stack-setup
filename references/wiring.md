@@ -16,6 +16,7 @@ if you bind there). Container-to-container, apps use names (`sonarr`, `decypharr
 4. Prowlarr → add Sonarr/Radarr as applications, then add indexers (UI)
 5. Bazarr → connect to Sonarr/Radarr, add Chinese
 6. Jellyseerr → setup wizard (UI), Plex/Jellyfin libraries + 中文化
+7. *(optional)* 弹幕 — Misaka + Sonarr/Radarr webhooks → bridge, backfill, players
 
 ---
 
@@ -147,6 +148,88 @@ curl -s -X POST "http://localhost:32400/library/sections?name=TV&type=show\
 API needs a key created in the UI first). Point its libraries at the same
 `/mnt/data/media/library/{movies,tv}`, set preferred metadata/subtitle language
 to Chinese.
+
+## 7. 弹幕 (danmaku) — Misaka + Sonarr/Radarr bridge  *(optional)*
+
+Deploy `references/compose-danmaku.yml` first (its header has the commands).
+The trigger is **Sonarr/Radarr**, not the media server: their webhook already
+carries the TMDB/TVDB id, season/episode and the file's full path, so the
+bridge can name `<video>.xml` exactly and never has to guess from filenames.
+Jellyfin/Plex only play.
+
+**7a. Misaka first boot (UI, `https://misaka.<tailnet>.ts.net`)**
+- Admin password: `docker logs misaka 2>&1 | grep -i password` — log in as
+  `admin`, change it.
+- `弹幕源` → enable the danmaku sources you want; `元信息搜索源` → TMDB → paste
+  a TMDB API key (needed for id-based matching; add TVDB too if Sonarr uses TVDB ids).
+- `外部控制` → `API 密钥` → generate → this is `MISAKA_API_KEY` for the bridge.
+- `弹幕` → `Token管理` → create one token per player/person → used in the
+  player URL `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`.
+- Leave Misaka's own media-server sync / Jellyfin webhook **off** — the
+  bridge is the only trigger; two triggers just queue duplicate imports.
+- Misaka scrapes Chinese video sites. From a non-China host some sources
+  geo-block or time out — set `设置` → `代理配置` if your sources come back empty.
+
+Put the API key into `docker-compose.danmaku.yml`, then
+`docker compose -p danmaku -f docker-compose.danmaku.yml up -d danmu-bridge`.
+
+**7b. Sonarr/Radarr → bridge webhooks**
+
+`Settings → Connect → + → Webhook`, URL `http://danmu-bridge:8090/webhook/sonarr`
+(Radarr: `/webhook/radarr`), method POST, triggers **On Import** + **On Upgrade**
+(plus **On File Delete** so the bridge can drop the orphaned xml). Via API:
+
+```bash
+WS=<YOUR_WEBHOOK_SECRET>   # same value as WEBHOOK_SECRET in the bridge (sent as basic-auth password)
+curl -s -X POST "http://$HOST:8989/api/v3/notification" -H "X-Api-Key: $SK" \
+ -H 'Content-Type: application/json' -d '{"name":"danmu-bridge",
+ "implementation":"Webhook","configContract":"WebhookSettings",
+ "onDownload":true,"onUpgrade":true,"onEpisodeFileDelete":true,
+ "fields":[{"name":"url","value":"http://danmu-bridge:8090/webhook/sonarr"},
+ {"name":"method","value":1},{"name":"username","value":"danmu"},
+ {"name":"password","value":"'$WS'"}]}'
+# Radarr: same body on :7878 with $RK, url .../webhook/radarr,
+#         and "onMovieFileDelete":true instead of onEpisodeFileDelete
+```
+Use the **Test** button (or `POST .../api/v3/notification/test`) — the bridge
+log should show the test event. The URL, port and auth above are the bridge's
+interface; if its README says otherwise, it wins.
+
+**7c. Backfill the existing library (once)**
+
+```bash
+docker exec danmu-bridge danmu-bridge backfill --dry-run   # list what would be submitted
+docker exec danmu-bridge danmu-bridge backfill
+```
+It walks every series/movie that has files in Sonarr/Radarr and submits them
+to Misaka by id + season/episode. Misaka refuses a resubmit of the same item
+within `externalApiDuplicateTaskThresholdHours` (default 3h), so re-running is
+safe; watch progress in Misaka's task list.
+
+**7d. Anime season/episode mismatches**
+
+Sonarr numbers anime by TVDB seasons; danmaku sites often number a cour as
+its own show, or run episodes on (S2E01 = "第 13 集"). Fix per series in Misaka,
+not in Sonarr:
+- **本地剧集组** (episode groups): map `local` (Sonarr's S/E) → `source`
+  (the site's episode), e.g. season 2 `{"local":1,"source":13}`. Takes priority
+  over auto-matching. Or bind a TMDB episode group to the entry.
+- **识别词** (title recognition): whole-series season/episode offsets and
+  title replacements — quicker when every episode is shifted by the same amount.
+Then re-submit that series (`backfill` again, or refresh it in Misaka's UI).
+
+**7e. Players**
+- **Jellyfin web**: install the dd-danmaku userscript/extension (chen3861229
+  or l429609201 fork) and set its API to
+  `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>`. Must be https — the
+  Jellyfin page is https and browsers block http calls from it.
+- **SenPlayer / Hills / Afusekt / 小幻影视** (dandanplay-compatible): 自定义弹幕
+  API → same URL. The device must be on the tailnet.
+- **Don't also install a Jellyfin danmaku *plugin* that downloads its own xml**
+  next to the videos (e.g. jellyfin-plugin-danmu): it fights the bridge's
+  sync over the same `<video>.xml` files. One writer only.
+- Players that read a sidecar `<video>.xml` from the library get danmaku with
+  no API at all — that's what the bridge's sync is for.
 
 ---
 
