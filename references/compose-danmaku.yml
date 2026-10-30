@@ -3,7 +3,8 @@
 # Place at /mnt/data/media/docker-compose.danmaku.yml
 # Bring up as its OWN compose project, AFTER the arr stack is running:
 #   cd /mnt/data/media
-#   mkdir -p misaka-config misaka-db misaka-ts && chown 1000:1000 misaka-db
+#   mkdir -p misaka-config misaka-db misaka-ts danmu-bridge-data
+#   chown 1000:1000 misaka-db danmu-bridge-data
 #   # misaka-ts/serve.json = the serve.json from tailscale-sidecars.md with
 #   # "Proxy": "http://127.0.0.1:7768"
 #   docker compose -p danmaku -f docker-compose.danmaku.yml config   # validate
@@ -37,8 +38,9 @@
 #   - Image/ports/paths below are from Misaka's own docs + source
 #     (github.com/l429609201/misaka_danmu_server); multi-arch, runs on ARM.
 #   - danmu-bridge is a small Go service maintained separately (not in this
-#     repo yet). Its image name, port and env var names below are the agreed
-#     interface — check them against the bridge's own README before deploying.
+#     repo). No published image yet: build it from its source dir
+#     (`docker build -t danmu-bridge:latest .`, multi-arch Dockerfile). Its own
+#     README is the reference for the env vars and webhook auth used below.
 # ============================================================================
 
 services:
@@ -105,10 +107,11 @@ services:
       misaka-ts: { condition: service_started }
 
   danmu-bridge:
-    image: <YOUR_DANMU_BRIDGE_IMAGE>        # or build from the bridge's source dir:
+    image: danmu-bridge:latest              # built locally from the bridge's source:
     # build: <PATH_TO_DANMU_BRIDGE_SOURCE>
     container_name: danmu-bridge
     restart: unless-stopped
+    user: "1000:1000"                       # same owner as the linuxserver containers
     environment:
       - TZ=UTC
       - MISAKA_URL=http://misaka:7768
@@ -117,11 +120,11 @@ services:
       - SONARR_API_KEY=<YOUR_SONARR_API_KEY>
       - RADARR_URL=http://radarr:7878
       - RADARR_API_KEY=<YOUR_RADARR_API_KEY>
-      - LIBRARY_ROOT=/mnt/data/media/library
-      - WEBHOOK_SECRET=<YOUR_WEBHOOK_SECRET>          # optional shared secret for the *arr webhooks
+      - WEBHOOK_SECRET=<YOUR_WEBHOOK_SECRET>          # Sonarr/Radarr send it as the webhook's basic-auth password
+      # optional: TV_ID_SOURCE=tmdb|tvdb, SYNC_INTERVAL=5m, IMPORT_DELAY=0s, LOG_LEVEL=info
     volumes:
-      - /mnt:/mnt:rslave                     # sees the library at its real path; writes <video>.xml beside symlinks
-      - ./misaka-config:/misaka-config:ro    # reads Misaka's XML store for the sync
+      - ./danmu-bridge-data:/data            # state: backfill progress + which xml files it wrote
+      - /mnt:/mnt:rslave                     # sees videos at the same paths Sonarr/Radarr report; writes <video>.xml beside symlinks
     # no ports: Sonarr/Radarr reach http://danmu-bridge:8090 over the network
     depends_on: [ misaka ]
 

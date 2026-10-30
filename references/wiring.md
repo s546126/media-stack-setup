@@ -176,35 +176,42 @@ Put the API key into `docker-compose.danmaku.yml`, then
 **7b. Sonarr/Radarr → bridge webhooks**
 
 `Settings → Connect → + → Webhook`, URL `http://danmu-bridge:8090/webhook/sonarr`
-(Radarr: `/webhook/radarr`), method POST, triggers **On Import** + **On Upgrade**
-(plus **On File Delete** so the bridge can drop the orphaned xml). Via API:
+(Radarr: `/webhook/radarr`), method POST, username `danmu` (any), password =
+`WEBHOOK_SECRET`. Triggers: **On File Import**, **On File Upgrade** (these submit
+to Misaka), plus **On Rename**, **On Episode/Movie File Delete**, **On
+Series/Movie Delete** (these only re-run the xml sync, so renamed videos get
+their xml moved and deleted ones lose theirs). Via API:
 
 ```bash
-WS=<YOUR_WEBHOOK_SECRET>   # same value as WEBHOOK_SECRET in the bridge (sent as basic-auth password)
+WS=<YOUR_WEBHOOK_SECRET>   # same value as WEBHOOK_SECRET in the bridge
 curl -s -X POST "http://$HOST:8989/api/v3/notification" -H "X-Api-Key: $SK" \
  -H 'Content-Type: application/json' -d '{"name":"danmu-bridge",
  "implementation":"Webhook","configContract":"WebhookSettings",
- "onDownload":true,"onUpgrade":true,"onEpisodeFileDelete":true,
+ "onDownload":true,"onUpgrade":true,"onRename":true,
+ "onEpisodeFileDelete":true,"onSeriesDelete":true,
  "fields":[{"name":"url","value":"http://danmu-bridge:8090/webhook/sonarr"},
  {"name":"method","value":1},{"name":"username","value":"danmu"},
  {"name":"password","value":"'$WS'"}]}'
 # Radarr: same body on :7878 with $RK, url .../webhook/radarr,
-#         and "onMovieFileDelete":true instead of onEpisodeFileDelete
+#         "onMovieFileDelete":true,"onMovieDelete":true instead of the episode/series ones
 ```
-Use the **Test** button (or `POST .../api/v3/notification/test`) — the bridge
-log should show the test event. The URL, port and auth above are the bridge's
-interface; if its README says otherwise, it wins.
+Press **Test** (or `POST .../api/v3/notification/test`): `docker logs danmu-bridge`
+should show `webhook test received from=sonarr`. `GET http://danmu-bridge:8090/healthz`
+returns `ok`. If basic auth is awkward, `.../webhook?token=<WEBHOOK_SECRET>` also works.
 
 **7c. Backfill the existing library (once)**
 
 ```bash
-docker exec danmu-bridge danmu-bridge backfill --dry-run   # list what would be submitted
-docker exec danmu-bridge danmu-bridge backfill
+docker exec danmu-bridge danmu-bridge backfill -dry-run    # list what would be submitted
+docker exec danmu-bridge danmu-bridge backfill -limit 5    # try a few first
+docker exec danmu-bridge danmu-bridge backfill             # everything (add -only tv|movie to split)
 ```
 It walks every series/movie that has files in Sonarr/Radarr and submits them
-to Misaka by id + season/episode. Misaka refuses a resubmit of the same item
-within `externalApiDuplicateTaskThresholdHours` (default 3h), so re-running is
-safe; watch progress in Misaka's task list.
+to Misaka by id + season/episode, one at a time (`BACKFILL_INTERVAL`, default
+20s, apart), waiting for each Misaka task. Progress is saved, so a restart or
+Ctrl-C just resumes; `-reset` starts over. On a big library this runs for a
+long time. The xml files appear on the next sync (every `SYNC_INTERVAL`, default
+5m; `docker exec danmu-bridge danmu-bridge sync` runs one now).
 
 **7d. Anime season/episode mismatches**
 
@@ -226,8 +233,9 @@ Then re-submit that series (`backfill` again, or refresh it in Misaka's UI).
 - **SenPlayer / Hills / Afusekt / 小幻影视** (dandanplay-compatible): 自定义弹幕
   API → same URL. The device must be on the tailnet.
 - **Don't also install a Jellyfin danmaku *plugin* that downloads its own xml**
-  next to the videos (e.g. jellyfin-plugin-danmu): it fights the bridge's
-  sync over the same `<video>.xml` files. One writer only.
+  next to the videos (e.g. jellyfin-plugin-danmu). The bridge never overwrites
+  an xml it didn't write, so wherever the plugin got there first, that video
+  keeps the plugin's xml and never gets Misaka's. One writer only.
 - Players that read a sidecar `<video>.xml` from the library get danmaku with
   no API at all — that's what the bridge's sync is for.
 

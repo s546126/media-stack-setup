@@ -107,9 +107,14 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
   beside the **symlink** under `/mnt/data/media/library`, never under
   `/mnt/zurg` (read-only FUSE; writes there fail or vanish). The bridge must
   see `/mnt` at `/mnt` (same path rule as everything else here).
-- **xml files flip-flop or duplicate**: two writers. Remove any Jellyfin
-  danmaku plugin that downloads its own xml, and keep Misaka's own media-server
-  sync off — the bridge is the only writer.
+- **Some videos never get an xml**: if another tool (a Jellyfin danmaku
+  plugin) already wrote `<video>.xml`, the bridge leaves it alone. Remove that
+  tool and its xml files, then `docker exec danmu-bridge danmu-bridge sync`.
+  Same fix if `danmu-bridge-data/sync-state.json` was lost: the bridge then
+  treats its own old xml as someone else's — delete them and re-sync.
+- **Bridge log counts `noEpisode`**: Misaka has the show but its season/episode
+  numbers don't match Sonarr's (anime, episode groups, absolute numbering) —
+  wiring.md §7d.
 - **Jellyfin web shows no danmaku but SenPlayer does**: the dd-danmaku script
   is calling `http://...` from the https Jellyfin page (mixed content, blocked
   silently) or an IP the browser can't reach. Use

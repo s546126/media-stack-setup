@@ -4,7 +4,8 @@
 #
 # Backs up the IRREPLACEABLE config (compose files, zurg config + rclone.conf,
 # each *arr app's config dir incl. its sqlite DB, alist data, and — if the
-# danmaku layer is deployed — Misaka's config + a pg_dump of its database).
+# danmaku layer is deployed — Misaka's config + a pg_dump of its database,
+# and the bridge's small state dir).
 # It does NOT back up media (that lives in Real-Debrid / the cloud) or
 # regenerable caches.
 #
@@ -58,6 +59,7 @@ LOG=/home/opc/config-backup.log
     "${MEDIA_DIR#/}/docker-compose.danmaku.yml" \
     "${MEDIA_DIR#/}/misaka-config" \
     "${MEDIA_DIR#/}/misaka-db.sql" \
+    "${MEDIA_DIR#/}/danmu-bridge-data" \
     2>/dev/null | rclone rcat "$REMOTE"
   echo "[$(date)] uploaded: $(rclone size "$REMOTE" 2>/dev/null | tr '\n' ' ')"
   # retention: drop backups older than RETENTION_DAYS
