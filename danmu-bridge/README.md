@@ -2,6 +2,8 @@
 
 把 Sonarr / Radarr 接到 [Misaka 弹幕服务器](https://github.com/l429609201/misaka_danmu_server)：新片入库时自动让 Misaka 按 TMDB/TVDB 去抓弹幕，再把弹幕 xml 写到媒体库里每个视频旁边。Jellyfin 只负责播放。
 
+部署、webhook、backfill 步骤见 [`docs/3-danmaku.md`](../docs/3-danmaku.md)；这里只讲服务本身。
+
 ```
 新入库：Sonarr/Radarr webhook ──▶ danmu-bridge ──▶ Misaka /api/control/import/auto（按 ID + 季集）
 存量：  danmu-bridge backfill ── 从 Sonarr/Radarr API 拉全部文件 ──逐个提交──▶ Misaka
@@ -31,12 +33,6 @@
 
 xml 写在软链接所在目录（媒体库里），不会跟着链接写进 debrid 挂载。
 
-## 准备 Misaka
-
-1. 在 Misaka 网页端「外部控制 → API 密钥」里拿到外部 API 密钥，填到 `MISAKA_API_KEY`。
-2. 在「元信息搜索源」里启用 TMDB（以及想用的话 TVDB）。没启用的源，Misaka 会直接返回 400，日志里会写明。
-3. 关掉 Jellyfin 的弹幕下载插件，或者至少别让它和这个服务同时往视频旁边写 xml。
-
 ## 部署
 
 镜像同时支持 amd64 和 arm64（Oracle ARM 主机直接用）：
@@ -45,30 +41,6 @@ xml 写在软链接所在目录（媒体库里），不会跟着链接写进 deb
 docker buildx build --platform linux/amd64,linux/arm64 -t danmu-bridge:latest .
 # 只在本机 ARM 上构建：
 docker build -t danmu-bridge:latest .
-```
-
-compose 片段（加入 `arr_default` 网络，这样能用容器名访问 sonarr/radarr/misaka；完整的编排见 media-stack-setup 的 compose-danmaku.yml）。不需要 `LIBRARY_ROOT`，也不需要挂 Misaka 的 config 目录：视频路径从 Sonarr/Radarr API 拿，弹幕从 Misaka 接口取。
-
-```yaml
-  danmu-bridge:
-    image: danmu-bridge:latest
-    container_name: danmu-bridge
-    restart: unless-stopped
-    user: "1000:1000"                 # 和 linuxserver 容器的 PUID/PGID 一致
-    environment:
-      - MISAKA_URL=http://misaka:7768
-      - MISAKA_API_KEY=<Misaka 外部 API 密钥>
-      - SONARR_URL=http://sonarr:8989
-      - SONARR_API_KEY=<Sonarr API Key>
-      - RADARR_URL=http://radarr:7878
-      - RADARR_API_KEY=<Radarr API Key>
-      - WEBHOOK_SECRET=<随便生成一串>
-      - TZ=UTC
-    volumes:
-      - ./danmu-bridge-data:/data
-      - /mnt:/mnt:rslave        # 和 Sonarr/Radarr 看到的路径一致，就不用 PATH_MAP
-    networks: [ arr_default ]
-    # 不需要对外暴露端口，Sonarr/Radarr 在同一网络里直接访问 danmu-bridge:8090
 ```
 
 ## 环境变量
@@ -92,44 +64,6 @@ compose 片段（加入 `arr_default` 网络，这样能用容器名访问 sonar
 | `STATE_DIR` | `/data` | 状态文件目录 |
 | `LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
 
-## 配置 Sonarr / Radarr webhook
-
-Sonarr：设置 → Connect → `+` → Webhook
-
-- Name：`danmu-bridge`
-- 触发：勾 **On File Import**、**On File Upgrade**、**On Rename**、**On Episode File Delete**、**On Series Delete**（On Import Complete 可勾可不勾，重复的会被去重）
-- Webhook URL：`http://danmu-bridge:8090/webhook/sonarr`
-- Method：`POST`
-- Username：`danmu`（随便填都行）；Password：填 `WEBHOOK_SECRET`
-- 点 Test，日志里出现 `webhook test received from=sonarr` 就通了
-
-Radarr：同样的位置
-
-- 触发：勾 **On File Import**、**On File Upgrade**、**On Rename**、**On Movie File Delete**、**On Movie Delete**
-- Webhook URL：`http://danmu-bridge:8090/webhook/radarr`
-- Username / Password 同上
-
-不想用 Basic Auth 的话，URL 写成 `http://danmu-bridge:8090/webhook?token=<WEBHOOK_SECRET>` 也行。
-
-## 跑存量 backfill
-
-```bash
-# 先看会提交什么
-docker exec danmu-bridge danmu-bridge backfill -dry-run
-# 先试 5 个
-docker exec danmu-bridge danmu-bridge backfill -limit 5
-# 全量，只跑电视剧，间隔 30 秒
-docker exec danmu-bridge danmu-bridge backfill -only tv -interval 30s
-# 清掉进度从头来
-docker exec danmu-bridge danmu-bridge backfill -reset
-```
-
-backfill 会等每个 Misaka 任务结束再提交下一个，库大的话要跑很久，中途 Ctrl-C 或重启都没关系。它和 `serve` 共用 Misaka 的搜索锁，撞上了会自动重试。
-
-## 播放端
-
-Jellyfin 本身不显示弹幕。网页端装弹幕脚本，手机上用支持弹弹play 接口或本地 xml 的播放器（如 SenPlayer），经 Tailscale 访问 Misaka 的弹弹play 兼容接口，或者直接读视频旁边的 xml。
-
 ## 开发
 
 ```bash
@@ -145,4 +79,3 @@ go run ./cmd/danmu-bridge sync     # 需要先设好环境变量
 - 季集匹配假设 Misaka 里的季号、集号和 Sonarr 一致。动画如果在 Misaka 里用了 TMDB 剧集组或绝对集数，可能匹配不上，日志里会计入 `noEpisode`，需要在 Misaka 里调整。
 - 一个文件包含多集（如 `S01E01-E02`）时，只用第一集的弹幕。
 - 如果 `sync-state.json` 丢了，之前写过的 xml 会被当成“别人的”而不再更新；删掉这些 xml 再跑一次即可重新生成。
-- Dockerfile 没有在这台机器上实际构建过（没有 Docker 守护进程），arm64 二进制交叉编译通过。
