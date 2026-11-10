@@ -1,4 +1,6 @@
-# Configuration backups
+# 4. Configuration backups
+
+`REPO` is set as in [1-deploy.md](1-deploy.md).
 
 `scripts/config-backup.sh` requires Linux Bash, `flock`, Docker CLI, GNU tar, and
 rclone. Run as an account that can read every included config and control Docker.
@@ -37,7 +39,7 @@ MEDIA_DIR=/mnt/data/media \
 REMOTE_DIR=gdrive:media-backups/configs \
 RETENTION_DAYS=14 \
 BACKUP_TMP_DIR=/var/tmp \
-/path/to/config-backup.sh
+"$REPO/scripts/config-backup.sh"
 ```
 
 Have enough space in `BACKUP_TMP_DIR` for one compressed config archive, including
@@ -54,7 +56,7 @@ cron). Redirect output to a private log owned by the backup account, and monitor
 nonzero exits using your scheduler or cron mail:
 
 ```cron
-30 4 * * * /path/to/config-backup.sh >> /path/to/private-backup.log 2>&1
+30 4 * * * $HOME/media-stack-setup/scripts/config-backup.sh >> /path/to/private-backup.log 2>&1
 ```
 
 ## Restore drill
@@ -74,3 +76,5 @@ Restore Misaka's database after `up -d misaka-db` with
 `docker exec -i misaka-db psql -U danmuapi -d danmuapi < misaka-db.sql`.
 Recreate mount preparation, named volumes and secrets as needed. Never extract
 an unreviewed archive directly over `/` or a running deployment.
+
+Next: [5-operate.md](5-operate.md).

@@ -1,29 +1,7 @@
 # ============================================================================
 # MEDIA STACK — zurg + rclone (+ alist) + Plex/Jellyfin
-# Place at e.g. /mnt/data/media/docker-compose.yml ; run from that dir.
-# ----------------------------------------------------------------------------
-# BEFORE bringing this up:
-#   1) zurg/config.yml  — minimal:
-#        zurg: v1
-#        token: <YOUR_REAL_DEBRID_API_TOKEN>     # from real-debrid.com/apitoken
-#        check_for_changes_every_secs: 10
-#        enable_repair: true
-#        # Add on_library_update only after configuring a working scan script.
-#        directories:
-#          shows:  { group_order: 10, group: media, filters: [ { has_episodes: true } ] }
-#          movies: { group_order: 20, group: media, filters: [ regex: /.*/ ] }
-#      (full example: github.com/debridmediamanager/zurg-testing)
-#   2) zurg/rclone.conf — a [zurg] WebDAV remote:
-#        [zurg]
-#        type = webdav
-#        url = http://zurg:9999/dav
-#        vendor = other
-#        pacer_min_sleep = 0
-#      (optional [alist] remote: url = http://alist-ts:5244/dav ; add credentials)
-#   3) zurg/scripts/plex_update.sh — the zurg-provided Plex partial-scan script
-#      Optional: mount it explicitly and use http://plex:32400 + your Plex token.
-#      localhost inside zurg is zurg itself, not Plex.
-#   4) mkdir -p /mnt/zurg /mnt/alist /mnt/data/cache /mnt/data/media/library/{tv,movies}
+# Deployed as /mnt/data/media/docker-compose.yml, project `-p media`.
+# Setup: docs/1-deploy.md
 #
 # KEY POINTS:
 #   - rclone needs cap_add SYS_ADMIN + /dev/fuse + apparmor:unconfined to FUSE-mount.
@@ -31,10 +9,9 @@
 #   - Plex/Jellyfin mount BOTH the app paths AND /mnt:/mnt:rslave — the latter is
 #     REQUIRED so the arr stack's symlinks (which point at /mnt/zurg/...) resolve.
 #   - PUID/PGID=1000 should match the owner of the ./ config dirs.
-#   - Enable --profile plex and/or --profile jellyfin; alist is also opt-in.
-#   - Prepare Linux shared mounts first: see deployment.md.
-#   - Set TS_AUTHKEY in .env only when enabling Tailscale-backed profiles.
-#     Plex and Jellyfin do the same job — run one or both.
+#   - Enable --profile plex and/or --profile jellyfin (they do the same job; run one
+#     or both); alist is opt-in. TS_AUTHKEY in .env is needed only for Tailscale-backed
+#     profiles (docs/tailscale.md).
 # ============================================================================
 
 services:
@@ -86,7 +63,7 @@ services:
       - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
-      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:5244 (see Phase 4)
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:5244 (docs/tailscale.md)
     volumes:
       - tailscale-alist:/var/lib/tailscale
       - ./alist-ts:/config
@@ -137,7 +114,7 @@ services:
       - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
-      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8096 (+ /danmaku/ -> Misaka, wiring.md §7e)
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8096 (+ /danmaku/ -> Misaka, docs/3-danmaku.md §5)
     volumes:
       - tailscale-jellyfin:/var/lib/tailscale
       - ./jellyfin-ts:/config
@@ -152,7 +129,7 @@ services:
       - ./jellyfin-config:/config
       - ./jellyfin-cache:/cache
       - /mnt:/mnt:rslave                # REQUIRED for symlink resolution
-      - ./jellyfin-init:/custom-cont-init.d:ro   # optional 弹幕 in Jellyfin web: put jellyfin/inject-danmaku.sh here (wiring.md §7e); empty = nothing
+      - ./jellyfin-init:/custom-cont-init.d:ro   # optional 弹幕 in Jellyfin web: put jellyfin/inject-danmaku.sh here (docs/3-danmaku.md §5); empty = nothing
     depends_on: [ rclone, jellyfin-ts ]
 
 volumes:

@@ -1,0 +1,8 @@
+zurg: v1
+token: <YOUR_REAL_DEBRID_API_TOKEN>     # from real-debrid.com/apitoken
+check_for_changes_every_secs: 10
+enable_repair: true
+# Add on_library_update only after configuring a working scan script.
+directories:
+  shows:  { group_order: 10, group: media, filters: [ { has_episodes: true } ] }
+  movies: { group_order: 20, group: media, filters: [ regex: /.*/ ] }
