@@ -1,3 +1,4 @@
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -31,6 +32,14 @@ class Templates(unittest.TestCase):
         self.assertIn('playback', arr['services']['jellyseerr']['networks'])
         self.assertIn('playback', media['services']['plex']['networks'])
         self.assertIn('jellyfin', media['services']['jellyfin-ts']['networks']['playback']['aliases'])
+
+    def test_danmaku_reaches_jellyfin_sidecar(self):
+        media = yaml.safe_load((ROOT / 'references/compose-media.yml').read_text())
+        danmaku = yaml.safe_load((ROOT / 'references/compose-danmaku.yml').read_text())
+        self.assertEqual(danmaku['networks']['playback'], media['networks']['playback'])
+        self.assertIn('misaka', danmaku['services']['misaka-ts']['networks']['playback']['aliases'])
+        self.assertIn('misaka', danmaku['services']['misaka-ts']['networks']['default']['aliases'])
+        self.assertIn('./jellyfin-init:/custom-cont-init.d:ro', media['services']['jellyfin']['volumes'])
 
     def test_mount_paths(self):
         for name, consumers in [('media', ['plex', 'jellyfin']), ('arr', ['sonarr', 'radarr', 'bazarr', 'decypharr'])]:
@@ -192,3 +201,67 @@ if [ "$1" = copyto ]; then tar -tzf "$2" > "$CALLS.archive"; fi
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.assertNotEqual(self.run_backup().returncode, 0)
             self.assertEqual(self.calls(), '')
+
+
+class DanmakuInjector(unittest.TestCase):
+    SCRIPT = ROOT / 'jellyfin/inject-danmaku.sh'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        base = Path(self.temp.name)
+        self.web, self.cache, self.bin = base / 'web', base / 'cache', base / 'bin'
+        for d in (self.web, self.bin):
+            d.mkdir()
+        self.index = self.web / 'index.html'
+        self.index.write_text('<html><body><div id="app"></div></body></html>')
+        self.source = base / 'upstream-ede.js'
+        self.source.write_text('console.log("ede");\n')
+        digest = hashlib.sha256(self.source.read_bytes()).hexdigest()
+        curl = self.bin / 'curl'
+        curl.write_text('#!/bin/bash\nwhile [ $# -gt 1 ]; do [ "$1" = -o ] && out=$2; shift; done\n'
+                        'echo x >> "$CALLS"; cp "$SOURCE" "$out"\n')
+        curl.chmod(0o755)
+        self.calls = base / 'calls'
+        self.env = dict(os.environ, PATH=f'{self.bin}:{os.environ["PATH"]}', DANMAKU_WEB_DIR=str(self.web),
+                        DANMAKU_CACHE_DIR=str(self.cache), EDE_SHA256=digest, SOURCE=str(self.source),
+                        CALLS=str(self.calls))
+
+    def run_script(self, **env):
+        result = subprocess.run(['bash', str(self.SCRIPT)], env=dict(self.env, **env), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def downloads(self):
+        return len(self.calls.read_text().splitlines()) if self.calls.exists() else 0
+
+    def test_injects_once_and_reuses_cache(self):
+        self.assertIn('injected', self.run_script())
+        html = self.index.read_text()
+        self.assertEqual(html.count('<script src="ede.js" defer></script>'), 1)
+        self.assertIn("setItem('customApiPrefix','/danmaku')", html)
+        self.assertTrue(html.endswith('</body></html>'))
+        self.assertEqual((self.web / 'ede.js').read_text(), self.source.read_text())
+        self.assertIn('already injected', self.run_script())
+        self.assertEqual(self.index.read_text(), html)
+        # A recreated container: clean web dir, cache still on /config.
+        (self.web / 'ede.js').unlink()
+        self.index.write_text('<html><body></body></html>')
+        self.run_script()
+        self.assertEqual(self.index.read_text().count('ede.js'), 1)
+        self.assertEqual(self.downloads(), 1)
+
+    def test_hash_mismatch_leaves_jellyfin_untouched(self):
+        self.assertIn('could not get ede.js', self.run_script(EDE_SHA256='0' * 64))
+        self.assertNotIn('ede.js', self.index.read_text())
+        self.assertFalse((self.web / 'ede.js').exists())
+        self.assertFalse(list(self.cache.glob('*')))
+
+    def test_rejects_unsafe_prefix(self):
+        for prefix in ['/dm', "/x');alert(1)//", 'http://misaka:7768/api/v1/t']:
+            self.assertIn('skipping', self.run_script(DANMAKU_API_PREFIX=prefix))
+        self.assertNotIn('script', self.index.read_text())
+
+    def test_custom_prefix(self):
+        self.run_script(DANMAKU_API_PREFIX='https://misaka.example.ts.net/api/v1/tok')
+        self.assertIn("'https://misaka.example.ts.net/api/v1/tok'", self.index.read_text())

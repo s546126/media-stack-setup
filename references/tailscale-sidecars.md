@@ -57,6 +57,12 @@ jellyseerr 5055, decypharr 8282, misaka 7768, libretv 8080). Put each in `./<svc
 (`compose-danmaku.yml` already ships Misaka this way, and the optional LibreTV
 with `http://127.0.0.1:8080`; Misaka's serve.json proxies to `http://127.0.0.1:7768`.)
 
+A sidecar can also route a path to another container: a second handler such as
+`"/danmaku/": { "Proxy": "http://misaka:7768/api/v1/<TOKEN>" }` strips
+`/danmaku` and forwards the rest. Jellyfin's sidecar uses this so its web page
+reaches Misaka on its own origin (wiring.md §7e); the target name must resolve
+on a network the sidecar shares (`misaka` is on `media-playback`).
+
 ## Compose pattern (per service, e.g. sonarr)
 
 ```yaml

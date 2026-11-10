@@ -137,7 +137,7 @@ services:
       - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
-      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8096
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8096 (+ /danmaku/ -> Misaka, wiring.md §7e)
     volumes:
       - tailscale-jellyfin:/var/lib/tailscale
       - ./jellyfin-ts:/config
@@ -152,6 +152,7 @@ services:
       - ./jellyfin-config:/config
       - ./jellyfin-cache:/cache
       - /mnt:/mnt:rslave                # REQUIRED for symlink resolution
+      - ./jellyfin-init:/custom-cont-init.d:ro   # optional 弹幕 in Jellyfin web: put jellyfin/inject-danmaku.sh here (wiring.md §7e); empty = nothing
     depends_on: [ rclone, jellyfin-ts ]
 
 volumes:

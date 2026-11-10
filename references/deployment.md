@@ -53,8 +53,9 @@ private published port. Claim it through an SSH tunnel when using localhost,
 and leave Plex Remote Access and router port forwarding disabled.
 
 The projects retain separate default networks for their internal traffic. A
-shared external `media-playback` bridge connects only Jellyseerr and the selected
-media servers. Create it once as above, then set Jellyseerr's internal server URL
+shared external `media-playback` bridge connects only Jellyseerr, the selected
+media servers and, with the optional danmaku layer, Misaka (so Jellyfin's
+sidecar can serve its API under `/danmaku/`). Create it once as above, then set Jellyseerr's internal server URL
 to `http://plex:32400` or `http://jellyfin:8096` (the alias belongs to the Jellyfin
 sidecar). This connection needs no host public port or Tailscale outbound proxy.
 For a zurg Plex scan hook, `http://plex:32400` works on the media default network.

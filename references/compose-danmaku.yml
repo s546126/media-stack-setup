@@ -25,9 +25,13 @@
 #   files       : Misaka keeps the XML; danmu-bridge's sync writes
 #                 <video name>.xml next to each symlink under the library
 #                 (local disk — never into the /mnt/zurg FUSE mount)
-#   playback    : Jellyfin web (dd-danmaku script) and dandanplay-compatible
-#                 clients (SenPlayer, Hills, …) call Misaka's dandanplay API over
-#                 Tailscale: https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>
+#   playback    : Jellyfin web: the jellyfin-danmaku script is injected into
+#                 Jellyfin's own page and calls https://jellyfin.<tailnet>.ts.net
+#                 /danmaku/…, which the jellyfin-ts sidecar proxies to
+#                 http://misaka:7768/api/v1/<TOKEN> (same origin, no CORS, token
+#                 stays server-side; misaka-ts joins media-playback for this).
+#                 dandanplay-compatible apps (SenPlayer, Hills, …) call Misaka's
+#                 API over Tailscale: https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>
 #   libretv     : (optional) LibreTV plays third-party sources in the browser;
 #                 its server asks Misaka by title + episode number for danmaku
 #                 (http://misaka:7768, token stays server-side)
@@ -43,8 +47,9 @@
 #   - Misaka's UI and dandanplay API are both on :7768. It rides a userspace
 #     tailscale sidecar with `serve` (443 → 127.0.0.1:7768), same pattern as
 #     the other services; the `misaka` alias keeps http://misaka:7768 working
-#     for the bridge. https matters: the Jellyfin web page is https, so a
-#     browser script calling plain-http Misaka is blocked as mixed content.
+#     for the bridge. misaka-ts also joins `media-playback` (alias `misaka`) so
+#     the jellyfin-ts sidecar can proxy Jellyfin's /danmaku/ path to Misaka.
+#     Bring the media stack's network up first (deployment.md creates it).
 #   - Image/ports/paths below are from Misaka's own docs + source
 #     (github.com/l429609201/misaka_danmu_server); multi-arch, runs on ARM.
 #   - danmu-bridge is the small Go service in this repo's `danmu-bridge/`
@@ -90,6 +95,8 @@ services:
     networks:
       default:
         aliases: [ misaka ]      # ← keeps http://misaka:7768 working for the bridge
+      playback:
+        aliases: [ misaka ]      # ← lets jellyfin-ts proxy /danmaku/ to http://misaka:7768 (wiring.md §7e)
     volumes:
       - tailscale-misaka:/var/lib/tailscale
       - ./misaka-ts:/config
@@ -180,6 +187,9 @@ services:
 networks:
   default:
     name: arr_default
+    external: true
+  playback:                      # shared with Jellyfin's sidecar (created in deployment.md)
+    name: media-playback
     external: true
 
 volumes:

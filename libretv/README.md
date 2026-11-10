@@ -10,7 +10,7 @@
                                /match → /search/episodes → /comment/{id}
 ```
 
-和片库无关：LibreTV 播的是采集站的片，不是 Jellyfin 里的。片库继续用 Jellyfin + dd-danmaku。
+和片库无关：LibreTV 播的是采集站的片，不是 Jellyfin 里的。片库继续用 Jellyfin，弹幕直接显示在 Jellyfin 自己的播放器里（`references/wiring.md` §7e）。
 
 ## 补丁做了什么
 
