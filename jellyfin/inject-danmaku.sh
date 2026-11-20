@@ -1,7 +1,7 @@
 #!/bin/bash
 # Injects the jellyfin-danmaku web script (Izumiko/jellyfin-danmaku, MIT) into
 # the Jellyfin web client, so every browser and the Jellyfin Android/iOS apps
-# get 弹幕 inside Jellyfin's own player: no userscript, no separate site.
+# get 弹幕 inside Jellyfin's own player: no userscript.
 #
 # Runs as a linuxserver.io custom init script: mount the directory holding it at
 # /custom-cont-init.d (root-owned, chmod 755). It runs on every container start,
@@ -14,7 +14,7 @@
 # The browser is told to call the danmaku API at DANMAKU_API_PREFIX, a path on
 # Jellyfin's own origin that the jellyfin-ts sidecar proxies to Misaka (with the
 # Misaka token added there), so there is no cross-origin request and no token in
-# the browser. See references/wiring.md §7e.
+# the browser. See docs/3-danmaku.md §5.
 set -u
 
 EDE_COMMIT=${EDE_COMMIT:-9967db0a7d9c7f0ee1a1aef17fa610341f636169}   # v1.62.0

@@ -1,0 +1,156 @@
+# ============================================================================
+# DANMAKU (弹幕) LAYER — Misaka danmu server + Postgres + Sonarr/Radarr bridge
+# Deployed as /mnt/data/media/docker-compose.danmaku.yml, project `-p danmaku`, as its
+# OWN project after the arr stack is running.
+# Setup: docs/3-danmaku.md (optional; its "How it fits" section explains the flow)
+#
+# KEY POINTS:
+#   - Joins the arr stack's network (`arr_default`, external here) so Sonarr/Radarr
+#     reach `danmu-bridge` by name and the bridge reaches `sonarr`, `radarr`, `misaka`.
+#     If you converted the arr apps to sidecars, their aliases keep working (docs/tailscale.md).
+#   - misaka-ts also joins `media-playback` (alias `misaka`) so the jellyfin-ts sidecar
+#     can proxy Jellyfin's /danmaku/ path to Misaka. The media stack's network must exist first.
+#   - Misaka supports MySQL or PostgreSQL only (no SQLite). Postgres is used here;
+#     MySQL works too (see Misaka's docs).
+#   - Misaka's UI and dandanplay API are both on :7768, served through the misaka-ts
+#     userspace tailscale sidecar (443 → 127.0.0.1:7768); the `misaka` alias keeps
+#     http://misaka:7768 working for the bridge.
+#   - danmu-bridge (no published image; built locally from danmu-bridge/, see its README)
+#     and libretv (profile `libretv`, built from libretv/, see its README) are both
+#     built locally. libretv is stateless: nothing to back up.
+# ============================================================================
+
+services:
+  misaka-db:
+    image: postgres:18
+    container_name: misaka-db
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - POSTGRES_USER=danmuapi
+      - POSTGRES_DB=danmuapi
+      - POSTGRES_PASSWORD=${MISAKA_DB_PASSWORD}
+      - TZ=UTC
+    volumes:
+      - ./misaka-db:/var/lib/postgresql    # postgres 18+ layout (not .../data)
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U danmuapi -d danmuapi" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # no ports: only misaka talks to it, over the shared network
+
+  misaka-ts:
+    image: tailscale/tailscale:latest
+    container_name: misaka-ts
+    restart: unless-stopped
+    hostname: misaka
+    environment:
+      - TS_HOSTNAME=misaka
+      - TS_AUTHKEY=${TS_AUTHKEY:-}           # reusable key, from .env (docs/tailscale.md)
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:7768
+    networks:
+      default:
+        aliases: [ misaka ]      # ← keeps http://misaka:7768 working for the bridge
+      playback:
+        aliases: [ misaka ]      # ← lets jellyfin-ts proxy /danmaku/ to http://misaka:7768 (docs/3-danmaku.md §5)
+    volumes:
+      - tailscale-misaka:/var/lib/tailscale
+      - ./misaka-ts:/config
+
+  misaka:
+    image: l429609201/misaka_danmu_server:latest   # mirror: ghcr.io/l429609201/misaka_danmu_server
+    container_name: misaka
+    restart: unless-stopped
+    network_mode: "service:misaka-ts"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=0022
+      - TZ=UTC
+      - DANMUAPI_DATABASE__TYPE=postgresql
+      - DANMUAPI_DATABASE__HOST=misaka-db
+      - DANMUAPI_DATABASE__PORT=5432
+      - DANMUAPI_DATABASE__NAME=danmuapi
+      - DANMUAPI_DATABASE__USER=danmuapi
+      - DANMUAPI_DATABASE__PASSWORD=${MISAKA_DB_PASSWORD}
+      - DANMUAPI_ADMIN__INITIAL_USER=admin   # first-boot password is printed in `docker logs misaka`
+    volumes:
+      - ./misaka-config:/app/config        # config.yml, logs, and the XML store (danmaku/{tv,movies})
+      # No docker.sock: skips Misaka's in-UI "update/restart" button, by design.
+    depends_on:
+      misaka-db: { condition: service_healthy }
+      misaka-ts: { condition: service_started }
+
+  danmu-bridge:
+    image: danmu-bridge:latest              # built locally from danmu-bridge/, or instead:
+    # build: $REPO/danmu-bridge
+    container_name: danmu-bridge
+    restart: unless-stopped
+    user: "1000:1000"                       # same owner as the linuxserver containers
+    environment:
+      - TZ=UTC
+      - MISAKA_URL=http://misaka:7768
+      - MISAKA_API_KEY=${MISAKA_API_KEY}   # Misaka UI → 外部控制 → API 密钥
+      - SONARR_URL=http://sonarr:8989
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}          # Sonarr/Radarr send it as the webhook's basic-auth password
+      # optional: TV_ID_SOURCE=tmdb|tvdb, SYNC_INTERVAL=5m, IMPORT_DELAY=0s, LOG_LEVEL=info
+    volumes:
+      - ./danmu-bridge-data:/data            # state: backfill progress + which xml files it wrote
+      - /mnt:/mnt:rslave                     # sees videos at the same paths Sonarr/Radarr report; writes <video>.xml beside symlinks
+    # no ports: Sonarr/Radarr reach http://danmu-bridge:8090 over the network
+    depends_on: [ misaka ]
+
+  # ---- optional: LibreTV web player with Misaka danmaku (profile libretv) ----
+  libretv-ts:
+    image: tailscale/tailscale:latest
+    container_name: libretv-ts
+    restart: unless-stopped
+    profiles: [ libretv ]
+    hostname: libretv
+    environment:
+      - TS_HOSTNAME=libretv
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json     # 443 -> 127.0.0.1:8080
+    networks:
+      default:
+        aliases: [ libretv ]
+    volumes:
+      - tailscale-libretv:/var/lib/tailscale
+      - ./libretv-ts:/config
+
+  libretv:
+    image: libretv-danmaku:latest           # built locally from libretv/, or instead:
+    # build: $REPO/libretv
+    container_name: libretv
+    restart: unless-stopped
+    profiles: [ libretv ]
+    network_mode: "service:libretv-ts"
+    environment:
+      - TZ=UTC
+      - PASSWORD=${LIBRETV_PASSWORD}      # LibreTV's own login
+      - MISAKA_URL=http://misaka:7768         # via misaka-ts's alias on this network
+      - MISAKA_TOKEN=${LIBRETV_MISAKA_TOKEN}      # Misaka UI → 弹幕 → Token管理, one just for LibreTV
+      # optional: PROXY_SECRET=<openssl rand -hex 32> (else derived from PASSWORD),
+      # DEFAULT_SOURCES / DEFAULT_SUBSCRIPTIONS (see upstream README)
+    # no ports: reach it at https://libretv.<tailnet>.ts.net
+    depends_on: [ libretv-ts, misaka ]
+
+networks:
+  default:
+    name: arr_default
+    external: true
+  playback:                      # shared with Jellyfin's sidecar (created in docs/1-deploy.md)
+    name: media-playback
+    external: true
+
+volumes:
+  tailscale-misaka:
+  tailscale-libretv:

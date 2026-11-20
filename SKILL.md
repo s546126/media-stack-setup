@@ -23,105 +23,20 @@ through a FUSE mount, and the *arr apps automate acquisition. Plex/Jellyfin
 serve playback; everything is reachable privately over Tailscale.
 
 This skill reflects a real single-host deployment (Oracle Always Free ARM). It
-works on any Linux box with Docker. Read the referenced files when you reach the
-phase that needs them — keep this file as the map.
+works on any Linux box with Docker. Keep this file as the map; the steps live in `docs/`.
 
-## What gets built (the pipeline)
+## How to run it
 
-```
-求片/索引 → Sonarr/Radarr 决定抓什么 → Decypharr 加种到 Real-Debrid
-  → zurg 串流挂载 /mnt/zurg → 符号链接进 library → Plex/Jellyfin 播放
-
-（可选）Sonarr/Radarr 导入 webhook → danmu-bridge → Misaka 抓弹幕
-  → <视频名>.xml 写在符号链接旁 ；播放端经 Tailscale 调 Misaka 弹弹play 接口
-```
-
-- **media stack** (`docker-compose.yml`): zurg (RD client, :9999 WebDAV) → rclone FUSE mount `/mnt/zurg`; alist (optional 百度/夸克/阿里云盘, :5244) → rclone-alist `/mnt/alist`; Plex (:32400) and/or Jellyfin (same role — pick one or run both).
-- **arr stack** (`docker-compose.arr.yml`, separate compose project `arr`): Prowlarr :9696, Sonarr :8989, Radarr :7878, Bazarr :6767, Jellyseerr :5055, Decypharr :8282 (the RD bridge).
-- **danmaku stack** (`docker-compose.danmaku.yml`, separate project `danmaku`, optional): Misaka danmu server :7768 (UI + dandanplay API) + Postgres + `danmu-bridge` (Sonarr/Radarr webhook receiver, backfill, xml sync). Triggered by Sonarr/Radarr — the media server only plays. Optional profile `libretv`: LibreTV :8080 (web player for third-party sources) whose server asks Misaka for 弹幕 by title + episode.
-- **access**: a Tailscale sidecar per user-facing service → `https://<svc>.<tailnet>.ts.net`, nothing on the public internet.
-- **safety net**: daily cron backup of all configs → Google Drive (rclone).
-
-## Prerequisites — check existing context; ask only for missing requirements
-
-1. **A Linux host with Docker** (1+ core, 2GB+ RAM; an Oracle Always Free ARM A1 works well). Use the official Docker Engine repository instructions for the host distribution if absent.
-2. **A Real-Debrid subscription** + its API token (`https://real-debrid.com/apitoken`).
-3. **A Tailscale account** (for private access) + ability to generate a **reusable, non-ephemeral** auth key (`https://login.tailscale.com/admin/settings/keys`).
-4. *(Optional)* Plex account / Plex Pass; a Google account + `rclone` gdrive remote for backups; cloud-drive creds for alist.
-
-Storage note: a **single boot disk is more robust than a separate data volume**. See `references/troubleshooting.md` ("storage layout") for why — a detached/failed extra volume mount is the classic way this stack breaks.
-
-## Phases — run in order
-
-Work top-down. Each phase points to the file with the concrete templates/commands.
-
-### Phase 1 — media stack (streaming foundation)
-Deploy zurg + rclone (+ optional alist) + Plex/Jellyfin.
-→ Use the template in **`references/compose-media.yml`** and the notes at its top
-(zurg `config.yml` with the RD token, the `rclone.conf`, the FUSE/`SYS_ADMIN`/`/dev/fuse` requirements, and the **`/mnt:/mnt:rslave`** mounts on Plex/Jellyfin).
-First follow **`references/deployment.md`** for shared-mount preparation, profiles,
-project names and private bindings. Verify: `ls /mnt/zurg` shows the RD library (`movies/`, `shows/`, …).
-
-### Phase 2 — arr automation stack
-Deploy Prowlarr/Sonarr/Radarr/Bazarr/Jellyseerr/Decypharr as a **separate compose project** (`-p arr`) so it never disturbs the media stack.
-→ Use **`references/compose-arr.yml`**. Bind UIs to the host's Tailscale IP (or localhost) — never `0.0.0.0` on a public host.
-Verify: all six containers `Up`; each UI returns 200/307.
-
-### Phase 3 — wire it together
-Most of this is automatable via each app's REST API (the API key lives in
-`<app>-config/config.xml`). Decypharr's RD bridge + symlink output is the linchpin.
-→ Follow **`references/wiring.md`** step by step (Decypharr RD + symlink dir,
-Prowlarr↔Sonarr/Radarr, Sonarr/Radarr→Decypharr download client, root folders,
-Bazarr↔arr). The symlink path-consistency rule is critical — see troubleshooting.
-
-### Phase 4 — private access via Tailscale
-Give each user-facing service its own Tailscale node using the **userspace
-sidecar + serve** pattern, so internal `arr` cross-talk keeps working while
-users get clean `https://<svc>.<tailnet>.ts.net` URLs.
-→ Follow **`references/tailscale-sidecars.md`** (needs the reusable auth key).
-
-### Phase 5 — 中文化 (Chinese metadata + subtitles)
-Set Plex/Jellyfin library language to `zh-CN`; in Bazarr add a Chinese language
-profile + a subtitle provider; optionally enable Plex/Jellyfin built-in subtitle
-download. → Section in **`references/wiring.md`** ("中文化").
-
-### Phase 6 — config backup
-Configure and test **`scripts/config-backup.sh`** using **`references/backup.md`**.
-It briefly stops running stack containers for a consistent archive, restarts them,
-then uploads (including Misaka's DB dump, if deployed). Confirm a restore drill before scheduling cron.
-
-### Phase 7 — 弹幕 (optional)
-Only if the user wants danmaku. Deploy Misaka + Postgres + the bridge as a
-separate compose project on the arr network, then wire Sonarr/Radarr webhooks,
-backfill the existing library, and point players at Misaka's dandanplay API.
-For Jellyfin web, embed it: inject **`jellyfin/inject-danmaku.sh`** via
-`./jellyfin-init` and add the `/danmaku/` handler to Jellyfin's sidecar
-serve.json (same origin, token server-side; no userscript, no CORS) — §7e.
-→ Template **`references/compose-danmaku.yml`**, steps in **`references/wiring.md`** §7.
-The bridge lives in **`danmu-bridge/`** (Go source + Dockerfile; build the image
-locally, its README lists every env var) — use it, don't improvise one. One xml writer only: no Jellyfin danmaku plugin alongside.
-Verify: import one episode in Sonarr → Misaka task succeeds → `<video>.xml`
-appears beside its symlink → danmaku shows in SenPlayer or Jellyfin web.
-Only if the user also wants LibreTV: build **`libretv/`** (upstream pinned +
-`danmaku.patch`) and start the `libretv` profile — **`references/wiring.md`** §7f.
+1. Follow the **Setup path** table in `README.md` top to bottom.
+2. Open each linked doc only when you reach its step. Steps 1 and 2 are required; step 3 (弹幕) and LibreTV only when the user asks for them.
+3. Prerequisites are at the top of `docs/1-deploy.md`. Check the existing context first and ask only for what is missing.
+4. Verify each step before moving on. When something breaks, go to `docs/troubleshooting.md`.
 
 ## Operating principles (apply throughout)
 
 - **Always `.bak` a compose/config file before editing**, and run `docker compose config` to validate before `up`. Bring up only the changed services (`docker compose up -d <svc>`) so you don't churn the whole stack.
 - **Treat secrets as secrets**: the RD token, Tailscale auth key, `rclone.conf`, and Plex token are sensitive. Use env references in compose; never print or commit them.
 - **Verify each phase before moving on** (a quick `ls`, `curl`, or `docker ps`). This stack has a few non-obvious failure modes; catching them per-phase is far cheaper than debugging the whole pipeline.
-- When something breaks, consult **`references/troubleshooting.md`** first — it documents the real gotchas (symlink path consistency, SELinux label breakage, lost mounts, containerd image store).
-
-## Bundled files
-
-- `references/deployment.md` — Linux preparation, profiles, networks and acceptance
-- `references/backup.md` — backup consistency, scheduling and restore
-- `references/compose-media.yml` — media stack template + setup notes
-- `references/compose-arr.yml` — arr automation stack template
-- `references/compose-danmaku.yml` — optional 弹幕 layer (Misaka + Postgres + bridge)
-- `references/wiring.md` — API wiring, Decypharr RD bridge, root folders, 中文化, 弹幕 (§7)
-- `references/tailscale-sidecars.md` — userspace sidecar + serve pattern
-- `references/troubleshooting.md` — storage layout + real-world gotchas
-- `scripts/config-backup.sh` — daily config backup to Google Drive
-- `danmu-bridge/` — source of the Sonarr/Radarr → Misaka bridge (弹幕 layer)
-- `libretv/` — LibreTV Dockerfile + danmaku patch, pinned upstream commit (optional)
+- When something breaks, consult **`docs/troubleshooting.md`** first — it documents the real gotchas (symlink path consistency, SELinux label breakage, lost mounts, containerd image store).
+- **Danmaku**: use the bridge in `danmu-bridge/` (build it locally; its README lists every env var) — don't improvise a replacement.
+- **One xml writer only**: no Jellyfin danmaku plugin alongside `danmu-bridge`.

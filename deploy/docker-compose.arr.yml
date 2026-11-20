@@ -1,27 +1,19 @@
 # ============================================================================
 # ARR AUTOMATION STACK — Prowlarr / Sonarr / Radarr / Bazarr / Jellyseerr / Decypharr
-# Place at /mnt/data/media/docker-compose.arr.yml
-# Bring up as a SEPARATE compose project so it never touches the media stack:
-#   cd /mnt/data/media
-#   docker network inspect media-playback >/dev/null 2>&1 || docker network create media-playback
-#   docker compose -p arr -f docker-compose.arr.yml config     # validate
-#   docker compose -p arr -f docker-compose.arr.yml pull
-#   docker compose -p arr -f docker-compose.arr.yml up -d
-# ----------------------------------------------------------------------------
-# This template defaults to localhost. Set BIND_IP in .env to the host's
-# Tailscale IPv4 address (`tailscale ip -4`) for tailnet access. Binding to that IP
-# means the ports are reachable over your tailnet but NOT on the public internet.
-# (For per-service https hostnames instead, convert to sidecars — see
-#  references/tailscale-sidecars.md. Start with host-IP binding; it's simpler.)
+# Deployed as /mnt/data/media/docker-compose.arr.yml, project `-p arr`: a SEPARATE
+# project, so it never touches the media stack.
+# Setup: docs/1-deploy.md, then docs/2-wire.md
 #
-# All six containers share the default `arr_default` network, so they reach each
-# other by container name (sonarr:8989, decypharr:8282, ...). The wiring in
-# references/wiring.md relies on that.
-#
-# Decypharr (cy01/blackhole) is the debrid bridge: it speaks the qBittorrent API
-# to Sonarr/Radarr, adds releases to Real-Debrid, and symlinks the cached files
-# from the rclone/zurg mount into download_folder. It MUST see /mnt at /mnt so
-# its symlinks (pointing at /mnt/zurg/...) are valid everywhere.
+# KEY POINTS:
+#   - Ports bind to ${BIND_IP:-127.0.0.1}. Set BIND_IP in .env to the host's Tailscale
+#     IPv4 (`tailscale ip -4`) for tailnet access: reachable over the tailnet, NOT the
+#     public internet. Per-service https names are optional: docs/tailscale.md.
+#   - All six containers share the default `arr_default` network and reach each other
+#     by container name (sonarr:8989, decypharr:8282, ...).
+#   - Decypharr (cy01/blackhole) is the debrid bridge: it speaks the qBittorrent API
+#     to Sonarr/Radarr, adds releases to Real-Debrid, and symlinks the cached files
+#     from the rclone/zurg mount into download_folder. It MUST see /mnt at /mnt so
+#     its symlinks (pointing at /mnt/zurg/...) are valid everywhere.
 # ============================================================================
 
 services:

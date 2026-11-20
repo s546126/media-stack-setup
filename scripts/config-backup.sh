@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Linux: run as the deployment owner with Docker access and readable configs.
-# See references/backup.md for setup, downtime, credentials, and restore.
+# See docs/4-backup.md for setup, downtime, credentials, and restore.
 set -Eeuo pipefail
 umask 077
 

@@ -42,25 +42,21 @@ nodes — test before assuming a key is reusable.
 
 ## serve.json (per service)
 
-```json
-{
-  "TCP": { "443": { "HTTPS": true } },
-  "Web": {
-    "${TS_CERT_DOMAIN}:443": {
-      "Handlers": { "/": { "Proxy": "http://127.0.0.1:8989" } }
-    }
-  }
-}
+Template: `deploy/serve/app.json` (copied to `/mnt/data/media/serve/` in step 1).
+For each sidecar, copy it to `./<svc>-ts/serve.json` and replace `<PORT>`:
+
+```bash
+mkdir -p prowlarr-ts && sed 's/<PORT>/9696/' serve/app.json > prowlarr-ts/serve.json
 ```
-Replace `8989` with the service's port (prowlarr 9696, radarr 7878, bazarr 6767,
-jellyseerr 5055, decypharr 8282, misaka 7768, libretv 8080). Put each in `./<svc>-ts/serve.json`.
-(`compose-danmaku.yml` already ships Misaka this way, and the optional LibreTV
-with `http://127.0.0.1:8080`; Misaka's serve.json proxies to `http://127.0.0.1:7768`.)
+Set `<PORT>` to the service's port (prowlarr 9696, radarr 7878, bazarr 6767,
+jellyseerr 5055, decypharr 8282, misaka 7768, libretv 8080; sonarr 8989).
+Put each in `./<svc>-ts/serve.json`. Misaka and LibreTV are set up this way in
+[3-danmaku.md](3-danmaku.md).
 
 A sidecar can also route a path to another container: a second handler such as
 `"/danmaku/": { "Proxy": "http://misaka:7768/api/v1/<TOKEN>" }` strips
 `/danmaku` and forwards the rest. Jellyfin's sidecar uses this so its web page
-reaches Misaka on its own origin (wiring.md §7e); the target name must resolve
+reaches Misaka on its own origin ([3-danmaku.md](3-danmaku.md) §5); the target name must resolve
 on a network the sidecar shares (`misaka` is on `media-playback`).
 
 ## Compose pattern (per service, e.g. sonarr)

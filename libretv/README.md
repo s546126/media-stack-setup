@@ -10,7 +10,7 @@
                                /match → /search/episodes → /comment/{id}
 ```
 
-和片库无关：LibreTV 播的是采集站的片，不是 Jellyfin 里的。片库继续用 Jellyfin，弹幕直接显示在 Jellyfin 自己的播放器里（`references/wiring.md` §7e）。
+和片库无关：LibreTV 播的是采集站的片，不是 Jellyfin 里的。片库继续用 Jellyfin，弹幕直接显示在 Jellyfin 自己的播放器里（[`docs/3-danmaku.md`](../docs/3-danmaku.md) §5）。
 
 ## 补丁做了什么
 
@@ -30,21 +30,21 @@
 ```bash
 git clone https://github.com/LibreSpark/LibreTV.git && cd LibreTV
 git checkout <新提交>
-git am <本仓库>/libretv/danmaku.patch      # 冲突多半在 src/components/player-shell.tsx
+git am $REPO/libretv/danmaku.patch      # 冲突多半在 src/components/player-shell.tsx
 npm install && npx tsc --noEmit && npm test
-git format-patch -1 --stdout > <本仓库>/libretv/danmaku.patch
+git format-patch -1 --stdout > $REPO/libretv/danmaku.patch
 ```
 
 再把 `LIBRETV_COMMIT` 改成新提交，重新 build。
 
 ## 构建和部署
 
-在 `references/compose-danmaku.yml` 里（profile `libretv`，默认不启动），步骤见 `references/wiring.md` §7f。
+在 `deploy/docker-compose.danmaku.yml` 里（profile `libretv`，默认不启动），步骤见 [`docs/3-danmaku.md`](../docs/3-danmaku.md) §8。
 
 ```bash
-docker build -t libretv-danmaku:latest <本仓库>/libretv
+docker build -t libretv-danmaku:latest $REPO/libretv
 # 在中国大陆构建可以改用镜像源：
-#   docker build --build-arg NPM_REGISTRY=https://registry.npmmirror.com/ -t libretv-danmaku:latest <本仓库>/libretv
+#   docker build --build-arg NPM_REGISTRY=https://registry.npmmirror.com/ -t libretv-danmaku:latest $REPO/libretv
 ```
 
 | 环境变量 | 说明 |

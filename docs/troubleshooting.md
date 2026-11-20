@@ -6,7 +6,7 @@ hours if you don't know them.
 ## Storage layout — prefer a single disk
 
 Media streams from RD, but VFS caches, metadata, transcodes and backup staging
-need local capacity (see `deployment.md`). A **separate block volume is a liability**: on cloud hosts an iSCSI data
+need local capacity (see [1-deploy.md](1-deploy.md)). A **separate block volume is a liability**: on cloud hosts an iSCSI data
 volume mounted via `/etc/fstab` with `_netdev` (and no `nofail`) can silently
 **fail to mount after a reboot**. When that happens, anything configured to write
 under the mountpoint (e.g. docker's `data-root` at `/mnt/data/docker`) quietly
@@ -102,7 +102,7 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
   non-China host — configure `设置 → 代理配置`. "Duplicate task" refusals within
   3h are Misaka's `externalApiDuplicateTaskThresholdHours`, not an error.
 - **Wrong episodes' danmaku (anime)**: TVDB vs. site numbering. Fix with a
-  本地剧集组 or a 识别词 offset in Misaka, then resubmit — see wiring.md §7d.
+  本地剧集组 or a 识别词 offset in Misaka, then resubmit — see [3-danmaku.md](3-danmaku.md) §7.
 - **xml lands in the wrong place / not next to the video**: the sync writes
   beside the **symlink** under `/mnt/data/media/library`, never under
   `/mnt/zurg` (read-only FUSE; writes there fail or vanish). The bridge must
@@ -114,12 +114,12 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
   treats its own old xml as someone else's — delete them and re-sync.
 - **Bridge log counts `noEpisode`**: Misaka has the show but its season/episode
   numbers don't match Sonarr's (anime, episode groups, absolute numbering) —
-  wiring.md §7d.
+  [3-danmaku.md](3-danmaku.md) §7.
 - **Jellyfin web: no 弹幕 toggle in the player**: the script wasn't injected.
   `docker logs jellyfin 2>&1 | grep -e custom-init -e danmaku-inject`:
   "is not an executable file" → `chmod 755` and `chown root:root` the script in
   `jellyfin-init/`; "could not get ede.js" → the host can't reach GitHub, set
-  `EDE_URL` to a mirror (wiring.md §7e); no line at all → the
+  `EDE_URL` to a mirror ([3-danmaku.md](3-danmaku.md) §5); no line at all → the
   `./jellyfin-init:/custom-cont-init.d` volume isn't on the running container
   (`up -d jellyfin` again). Then hard-refresh the browser, which caches the page.
 - **Jellyfin web: toggle is there but no 弹幕**: open
@@ -129,17 +129,17 @@ scans. Confirm the boot disk is NOT iSCSI (`readlink -f /sys/block/sda` →
   502 → the sidecar can't reach `misaka:7768`: `misaka-ts` must be on
   `media-playback` (`docker network inspect media-playback` lists it; re-run the
   danmaku project's `up -d`). JSON with `success:false`, a 401/403 or
-  "User-Agent" → wrong or disabled token, or Misaka's UA filter. Misaka JSON
+  "User-Agent" → wrong or disabled token, or Misaka's UA filter.
+- **Browser still calls Misaka directly / comments drawn twice**: Misaka JSON
   with results but still nothing on screen → in `设置` → `弹幕设置` check 自定义API
   is `/danmaku` (a browser that saved the old misaka URL keeps it) and that the
-  match picked the right show; fix the match in Misaka (§7d).
-- **CORS / mixed-content errors in the browser console**: the browser is still
-  calling Misaka's own host. With the setup in wiring.md §7e every call goes to
-  Jellyfin's origin, so set 自定义API to `/danmaku`. If you prefer calling
-  `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>` directly, that works too:
-  Misaka allows any origin. Plain `http://` from the https Jellyfin page is
-  blocked as mixed content, and a Tampermonkey copy of the script alongside the
-  injected one shows every comment twice.
+  match picked the right show; fix the match in Misaka ([3-danmaku.md](3-danmaku.md) §7).
+  CORS or mixed-content errors in the console mean the same thing: the browser is still
+  calling Misaka's own host. With the setup in [3-danmaku.md](3-danmaku.md) §5 every call
+  goes to Jellyfin's origin, so set 自定义API to `/danmaku`. Calling
+  `https://misaka.<tailnet>.ts.net/api/v1/<TOKEN>` directly also works (Misaka allows any
+  origin), but plain `http://` from the https Jellyfin page is blocked as mixed content,
+  and a Tampermonkey copy of the script alongside the injected one draws every comment twice.
 - **LibreTV plays but shows no danmaku**: `docker logs libretv` and, in the
   browser, the `/api/danmaku` response. `enabled:false` means `MISAKA_URL` or
   `MISAKA_TOKEN` isn't set; a 502 means LibreTV can't reach Misaka (it must be on

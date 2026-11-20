@@ -7,12 +7,18 @@ import unittest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+COMPOSE = {'media': 'deploy/docker-compose.yml', 'arr': 'deploy/docker-compose.arr.yml',
+           'danmaku': 'deploy/docker-compose.danmaku.yml'}
+
+
+def load(name):
+    return yaml.safe_load((ROOT / COMPOSE[name]).read_text())
 
 
 class Templates(unittest.TestCase):
     def test_private_ports_and_optional_services(self):
         for name in ('media', 'arr'):
-            config = yaml.safe_load((ROOT / f'references/compose-{name}.yml').read_text())
+            config = load(name)
             for service in config['services'].values():
                 self.assertNotEqual(service.get('network_mode'), 'host')
                 for port in service.get('ports', []):
@@ -21,12 +27,12 @@ class Templates(unittest.TestCase):
                     target = service['network_mode'].split(':', 1)[1]
                     self.assertIn(target, config['services'])
                     self.assertEqual(service.get('profiles'), config['services'][target].get('profiles'))
-        media = yaml.safe_load((ROOT / 'references/compose-media.yml').read_text())
+        media = load('media')
         self.assertEqual({k for k, v in media['services'].items() if not v.get('profiles')}, {'zurg', 'rclone'})
 
     def test_cross_project_playback_network(self):
-        media = yaml.safe_load((ROOT / 'references/compose-media.yml').read_text())
-        arr = yaml.safe_load((ROOT / 'references/compose-arr.yml').read_text())
+        media = load('media')
+        arr = load('arr')
         self.assertEqual(media['networks']['playback'], arr['networks']['playback'])
         self.assertTrue(media['networks']['playback']['external'])
         self.assertIn('playback', arr['services']['jellyseerr']['networks'])
@@ -34,8 +40,8 @@ class Templates(unittest.TestCase):
         self.assertIn('jellyfin', media['services']['jellyfin-ts']['networks']['playback']['aliases'])
 
     def test_danmaku_reaches_jellyfin_sidecar(self):
-        media = yaml.safe_load((ROOT / 'references/compose-media.yml').read_text())
-        danmaku = yaml.safe_load((ROOT / 'references/compose-danmaku.yml').read_text())
+        media = load('media')
+        danmaku = load('danmaku')
         self.assertEqual(danmaku['networks']['playback'], media['networks']['playback'])
         self.assertIn('misaka', danmaku['services']['misaka-ts']['networks']['playback']['aliases'])
         self.assertIn('misaka', danmaku['services']['misaka-ts']['networks']['default']['aliases'])
@@ -43,9 +49,14 @@ class Templates(unittest.TestCase):
 
     def test_mount_paths(self):
         for name, consumers in [('media', ['plex', 'jellyfin']), ('arr', ['sonarr', 'radarr', 'bazarr', 'decypharr'])]:
-            config = yaml.safe_load((ROOT / f'references/compose-{name}.yml').read_text())
+            config = load(name)
             for consumer in consumers:
                 self.assertIn('/mnt:/mnt:rslave', config['services'][consumer]['volumes'])
+
+    def test_serve_templates_are_json(self):
+        import json
+        for path in (ROOT / 'deploy/serve').glob('*.json'):
+            json.loads(path.read_text())
 
 
 class Backup(unittest.TestCase):
